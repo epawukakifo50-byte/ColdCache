@@ -1,0 +1,6 @@
+{
+  "name": "ColdCache",
+  "description": "Sci-Fi Task Manager with Active RAM, Cryo Storage, and DevNull",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,174 @@
+package com.example.data.local
+
+import android.content.Context
+import android.content.SharedPreferences
+import com.example.model.*
+import org.json.JSONObject
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+class PreferenceManager(context: Context) {
+    private val prefs: SharedPreferences = context.getSharedPreferences("coldcache_prefs", Context.MODE_PRIVATE)
+
+    fun loadSystemConfig(): SystemConfig {
+        val colorMode = try {
+            ColorMode.valueOf(prefs.getString("cc_mode", ColorMode.DARK.name) ?: ColorMode.DARK.name)
+        } catch (_: Exception) { ColorMode.DARK }
+
+        val sensoryTheme = try {
+            SensoryTheme.valueOf(prefs.getString("cc_sensory_theme", SensoryTheme.CYBER_NEON.name) ?: SensoryTheme.CYBER_NEON.name)
+        } catch (_: Exception) { SensoryTheme.CYBER_NEON }
+
+        val terminology = try {
+            Terminology.valueOf(prefs.getString("cc_term", Terminology.SYSTEM.name) ?: Terminology.SYSTEM.name)
+        } catch (_: Exception) { Terminology.SYSTEM }
+
+        val uiShape = try {
+            UiShapeStyle.valueOf(prefs.getString("cc_shape", UiShapeStyle.DIAG.name) ?: UiShapeStyle.DIAG.name)
+        } catch (_: Exception) { UiShapeStyle.DIAG }
+
+        val colorStyle = try {
+            ColorStyle.valueOf(prefs.getString("cc_color_style", ColorStyle.FLAT.name) ?: ColorStyle.FLAT.name)
+        } catch (_: Exception) { ColorStyle.FLAT }
+
+        val accent1 = prefs.getString("cc_accent1", "#06b6d4") ?: "#06b6d4"
+        val accent2 = prefs.getString("cc_accent2", "#a855f7") ?: "#a855f7"
+        val glowLevel = prefs.getInt("cc_glow", 20)
+        val daemonShadeTracker = prefs.getBoolean("cc_daemon_shade", true)
+        val taskRemindersEnabled = prefs.getBoolean("cc_task_reminders", true)
+        val ramIdleReminderEnabled = prefs.getBoolean("cc_ram_idle", true)
+        val hapticFeedbackEnabled = prefs.getBoolean("cc_haptic", true)
+        val thermalDissipationEnabled = prefs.getBoolean("cc_thermal_fx", true)
+        val quickBufferInShade = prefs.getBoolean("cc_quick_buffer_shade", true)
+
+        return SystemConfig(
+            colorMode = colorMode,
+            sensoryTheme = sensoryTheme,
+            terminology = terminology,
+            uiShape = uiShape,
+            colorStyle = colorStyle,
+            accent1 = accent1,
+            accent2 = accent2,
+            glowLevel = glowLevel,
+            daemonShadeTracker = daemonShadeTracker,
+            taskRemindersEnabled = taskRemindersEnabled,
+            ramIdleReminderEnabled = ramIdleReminderEnabled,
+            hapticFeedbackEnabled = hapticFeedbackEnabled,
+            thermalDissipationEnabled = thermalDissipationEnabled,
+            quickBufferInShade = quickBufferInShade
+        )
+    }
+
+    fun saveSystemConfig(config: SystemConfig) {
+        prefs.edit()
+            .putString("cc_mode", config.colorMode.name)
+            .putString("cc_sensory_theme", config.sensoryTheme.name)
+            .putString("cc_term", config.terminology.name)
+            .putString("cc_shape", config.uiShape.name)
+            .putString("cc_color_style", config.colorStyle.name)
+            .putString("cc_accent1", config.accent1)
+            .putString("cc_accent2", config.accent2)
+            .putInt("cc_glow", config.glowLevel)
+            .putBoolean("cc_daemon_shade", config.daemonShadeTracker)
+            .putBoolean("cc_task_reminders", config.taskRemindersEnabled)
+            .putBoolean("cc_ram_idle", config.ramIdleReminderEnabled)
+            .putBoolean("cc_haptic", config.hapticFeedbackEnabled)
+            .putBoolean("cc_thermal_fx", config.thermalDissipationEnabled)
+            .putBoolean("cc_quick_buffer_shade", config.quickBufferInShade)
+            .apply()
+    }
+
+    fun loadDaemons(): Map<String, Daemon> {
+        val savedJson = prefs.getString("cc_daemons", null)
+        val lastDate = prefs.getString("cc_date", null)
+        val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+
+        val isNewDay = lastDate != null && lastDate != today
+        prefs.edit().putString("cc_date", today).apply()
+
+        if (savedJson.isNullOrEmpty()) {
+            return DEFAULT_DAEMONS
+        }
+
+        val daemons = try {
+            val root = JSONObject(savedJson)
+            val result = mutableMapOf<String, Daemon>()
+            for (key in listOf("d1", "d2", "d3")) {
+                val defaultD = DEFAULT_DAEMONS[key]!!
+                if (root.has(key)) {
+                    val obj = root.getJSONObject(key)
+                    val label = obj.optString("label", defaultD.label)
+                    val max = obj.optInt("max", defaultD.max)
+                    val step = obj.optInt("step", defaultD.step)
+                    val iconName = obj.optString("iconName", defaultD.iconName)
+                    val current = if (isNewDay) 0 else obj.optInt("current", 0)
+                    result[key] = Daemon(key, label, current, max, step, iconName)
+                } else {
+                    result[key] = defaultD
+                }
+            }
+            result
+        } catch (_: Exception) {
+            DEFAULT_DAEMONS
+        }
+
+        if (isNewDay) {
+            saveDaemons(daemons)
+        }
+
+        return daemons
+    }
+
+    fun resetDailyDaemons(): Map<String, Daemon> {
+        val currentDaemons = loadDaemons()
+        val reset = currentDaemons.mapValues { (_, d) -> d.copy(current = 0) }
+        saveDaemons(reset)
+        val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        prefs.edit().putString("cc_date", today).apply()
+        return reset
+    }
+
+    fun registerChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+    }
+
+    fun unregisterChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {
+        prefs.unregisterOnSharedPreferenceChangeListener(listener)
+    }
+
+    fun saveDaemons(daemons: Map<String, Daemon>) {
+        val root = JSONObject()
+        for ((key, d) in daemons) {
+            val obj = JSONObject()
+            obj.put("label", d.label)
+            obj.put("current", d.current)
+            obj.put("max", d.max)
+            obj.put("step", d.step)
+            obj.put("iconName", d.iconName)
+            root.put(key, obj)
+        }
+        prefs.edit().putString("cc_daemons", root.toString()).apply()
+    }
+
+    fun loadSystemState(): AppSystemState {
+        val stateStr = prefs.getString("cc_state", AppSystemState.NORMAL.name)
+        return try {
+            AppSystemState.valueOf(stateStr ?: AppSystemState.NORMAL.name)
+        } catch (_: Exception) {
+            AppSystemState.NORMAL
+        }
+    }
+
+    fun saveSystemState(state: AppSystemState) {
+        prefs.edit().putString("cc_state", state.name).apply()
+    }
+
+    fun loadActiveTaskId(): String? {
+        return prefs.getString("cc_active_task_id", null)
+    }
+
+    fun saveActiveTaskId(id: String?) {
+        prefs.edit().putString("cc_active_task_id", id).apply()
+    }
+}

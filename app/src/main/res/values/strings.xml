@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">ColdCache</string>
+    <string name="widget_name_overview">ColdCache: Обзор системы</string>
+    <string name="widget_name_ram1">ColdCache: RAM Слот 1</string>
+    <string name="widget_name_ram2">ColdCache: RAM Слот 2</string>
+    <string name="widget_name_daemons">ColdCache: Демоны</string>
+</resources>

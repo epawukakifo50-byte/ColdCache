@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <application
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.MyApplication">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.MyApplication">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Rapid 1-line Buffer Dump Floating Dialog -->
+        <activity
+            android:name=".QuickBufferActivity"
+            android:exported="true"
+            android:label="Dump to Buffer"
+            android:theme="@style/Theme.MyApplication"
+            android:windowSoftInputMode="stateVisible|adjustResize" />
+
+        <!-- Ongoing Foreground Service for Daemon Tracking in Notification Shade -->
+        <service
+            android:name=".service.DaemonTrackerService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Daemon status tracking and active RAM task persistent indicator" />
+        </service>
+
+        <!-- Receivers for Tasks and Daemons -->
+        <receiver
+            android:name=".service.TaskAlarmReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="com.example.coldcache.ACTION_TASK_1H_REMINDER" />
+                <action android:name="com.example.coldcache.ACTION_MORNING_REMINDER" />
+                <action android:name="com.example.coldcache.ACTION_RAM_IDLE_CHECK" />
+                <action android:name="com.example.coldcache.ACTION_MIDNIGHT_RESET" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".service.DaemonActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.example.coldcache.ACTION_INTERACT_DAEMON" />
+                <action android:name="com.example.coldcache.ACTION_TOGGLE_SUBTASK" />
+                <action android:name="com.example.coldcache.ACTION_DAEMON_DISMISSED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Desktop AppWidget Providers -->
+        <!-- 1. System Overview Widget -->
+        <receiver
+            android:name=".widget.ColdCacheOverviewWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/cold_cache_widget_info" />
+        </receiver>
+
+        <!-- 2. RAM Slot 1 Task Render Widget -->
+        <receiver
+            android:name=".widget.ColdCacheRam1WidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_ram1_info" />
+        </receiver>
+
+        <!-- 3. RAM Slot 2 Task Render Widget -->
+        <receiver
+            android:name=".widget.ColdCacheRam2WidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_ram2_info" />
+        </receiver>
+
+        <!-- 4. Daemons Interactive Deck Widget -->
+        <receiver
+            android:name=".widget.ColdCacheDaemonsWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_daemons_info" />
+        </receiver>
+
+    </application>
+
+</manifest>
