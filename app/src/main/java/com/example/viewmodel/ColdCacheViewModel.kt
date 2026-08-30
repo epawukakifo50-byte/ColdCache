@@ -70,6 +70,9 @@ class ColdCacheViewModel(
     private val _isSettingsOpen = MutableStateFlow(false)
     val isSettingsOpen: StateFlow<Boolean> = _isSettingsOpen.asStateFlow()
 
+    private val _isMatrixOpen = MutableStateFlow(false)
+    val isMatrixOpen: StateFlow<Boolean> = _isMatrixOpen.asStateFlow()
+
     private val _isManualOpen = MutableStateFlow(false)
     val isManualOpen: StateFlow<Boolean> = _isManualOpen.asStateFlow()
 
@@ -203,14 +206,61 @@ class ColdCacheViewModel(
         com.example.util.AppHaptics.tick(appContext, _systemConfig.value.hapticFeedbackEnabled)
     }
 
-    fun updateDaemonConfig(key: String, label: String? = null, max: Int? = null, step: Int? = null, iconName: String? = null) {
+    private val stepSensorManager = com.example.sensor.StepSensorManager(appContext).apply {
+        onStepsUpdated = {
+            _daemons.value = prefManager.loadDaemons()
+            syncExternalViews()
+        }
+        startListening()
+    }
+
+    fun addCustomDaemon(label: String, max: Int, step: Int, iconName: String, type: DaemonType = DaemonType.MANUAL, colorHex: String? = null) {
+        val currentDaemons = _daemons.value.toMutableMap()
+        val newKey = "d_${System.currentTimeMillis()}"
+        val newDaemon = Daemon(
+            key = newKey,
+            label = label.trim().ifBlank { "DAEMON" },
+            current = 0,
+            max = max.coerceAtLeast(1),
+            step = step.coerceAtLeast(1),
+            iconName = iconName,
+            type = type,
+            colorHex = colorHex
+        )
+        currentDaemons[newKey] = newDaemon
+        _daemons.value = currentDaemons
+        prefManager.saveDaemons(currentDaemons)
+        syncExternalViews()
+        com.example.util.AppHaptics.success(appContext, _systemConfig.value.hapticFeedbackEnabled)
+    }
+
+    fun deleteCustomDaemon(key: String) {
+        val currentDaemons = _daemons.value.toMutableMap()
+        currentDaemons.remove(key)
+        _daemons.value = currentDaemons
+        prefManager.saveDaemons(currentDaemons)
+        syncExternalViews()
+        com.example.util.AppHaptics.snap(appContext, _systemConfig.value.hapticFeedbackEnabled)
+    }
+
+    fun updateDaemonFull(daemon: Daemon) {
+        val currentDaemons = _daemons.value.toMutableMap()
+        currentDaemons[daemon.key] = daemon
+        _daemons.value = currentDaemons
+        prefManager.saveDaemons(currentDaemons)
+        syncExternalViews()
+    }
+
+    fun updateDaemonConfig(key: String, label: String? = null, max: Int? = null, step: Int? = null, iconName: String? = null, type: DaemonType? = null, colorHex: String? = null) {
         val currentDaemons = _daemons.value.toMutableMap()
         val d = currentDaemons[key] ?: return
         currentDaemons[key] = d.copy(
             label = label ?: d.label,
             max = max ?: d.max,
             step = step ?: d.step,
-            iconName = iconName ?: d.iconName
+            iconName = iconName ?: d.iconName,
+            type = type ?: d.type,
+            colorHex = colorHex ?: d.colorHex
         )
         _daemons.value = currentDaemons
         prefManager.saveDaemons(currentDaemons)
@@ -428,6 +478,7 @@ class ColdCacheViewModel(
     fun openBuffer(open: Boolean) { _isBufferOpen.value = open }
     fun openTemporal(open: Boolean) { _isTemporalOpen.value = open }
     fun openLog(open: Boolean) { _isLogOpen.value = open }
+    fun openMatrix(open: Boolean) { _isMatrixOpen.value = open }
     fun openSettings(open: Boolean) { _isSettingsOpen.value = open }
     fun openManual(open: Boolean) { _isManualOpen.value = open }
     fun setSchedulingTask(task: Task?) { _schedulingTask.value = task }
@@ -440,9 +491,17 @@ class ColdCacheViewModel(
         if (_isBufferOpen.value) { _isBufferOpen.value = false; return true }
         if (_isTemporalOpen.value) { _isTemporalOpen.value = false; return true }
         if (_isLogOpen.value) { _isLogOpen.value = false; return true }
+        if (_isMatrixOpen.value) { _isMatrixOpen.value = false; return true }
         if (_isSettingsOpen.value) { _isSettingsOpen.value = false; return true }
         if (_isManualOpen.value) { _isManualOpen.value = false; return true }
         return false
+    }
+
+    fun exportMarkdownJournal() {
+        val tasks = allActiveTasks.value
+        val archive = renderLog.value
+        val daemonsMap = _daemons.value
+        com.example.util.MarkdownExportHelper.exportAndShare(appContext, tasks, archive, daemonsMap)
     }
 
     // --- Export / Import Memory Dump ---

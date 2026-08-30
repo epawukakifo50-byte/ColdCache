@@ -96,8 +96,12 @@ fun SettingsModal(
     daemons: Map<String, Daemon>,
     onUpdateConfig: ((SystemConfig) -> SystemConfig) -> Unit,
     onUpdateDaemon: (String, String?, Int?, Int?, String?) -> Unit,
+    onAddDaemon: (String, Int, Int, String, com.example.model.DaemonType, String?) -> Unit = { _, _, _, _, _, _ -> },
+    onDeleteDaemon: (String) -> Unit = {},
+    onUpdateDaemonFull: (Daemon) -> Unit = {},
     onExportDump: () -> String,
     onImportDump: (String) -> Boolean,
+    onExportMarkdown: () -> Unit = {},
     onClose: () -> Unit
 ) {
     val colors = LocalColdCacheColors.current
@@ -111,6 +115,14 @@ fun SettingsModal(
     // Custom Color Picker Dialog State
     var colorPickerTarget by remember { mutableStateOf<String?>(null) } // "accent1" or "accent2"
     var colorPickerHex by remember { mutableStateOf("") }
+
+    // New Daemon Creator State
+    var isCreatingDaemon by remember { mutableStateOf(false) }
+    var newDaemonLabel by remember { mutableStateOf("") }
+    var newDaemonMax by remember { mutableStateOf("100") }
+    var newDaemonStep by remember { mutableStateOf("1") }
+    var newDaemonIcon by remember { mutableStateOf("SquareActivity") }
+    var newDaemonType by remember { mutableStateOf(com.example.model.DaemonType.MANUAL) }
 
     Column(
         modifier = Modifier
@@ -1002,9 +1014,7 @@ fun SettingsModal(
                         modifier = Modifier
                             .clip(shapes.secondary)
                             .background(if (config.thermalDissipationEnabled) colors.bgButtonActive else colors.bgButton)
-                            .border(0.5.dp, if (config.thermalDissipationEnabled) colors.accent1 else colors.borderStrong.copy(alpha = 0.35f), shapes.secondary)
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
-                    ) {
+) {
                         Text(
                             text = if (config.thermalDissipationEnabled) "ON" else "OFF",
                             color = if (config.thermalDissipationEnabled) colors.accent1 else colors.textMuted,
@@ -1016,10 +1026,10 @@ fun SettingsModal(
                 }
             }
 
-            // === SECTION 2: MEMORY_MANAGEMENT ===
+            // === SECTION 2: MEMORY_MANAGEMENT & JOURNAL ===
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    text = "MEMORY_MANAGEMENT",
+                    text = "MEMORY_MANAGEMENT & JOURNAL",
                     color = colors.textMuted,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
@@ -1027,11 +1037,46 @@ fun SettingsModal(
                     letterSpacing = 1.5.sp
                 )
 
+                // Markdown Export Button
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(shapes.secondary)
+                        .background(colors.bgPanel)
+                        .border(1.dp, colors.accent1.copy(alpha = 0.5f), shapes.secondary)
+                        .clickable {
+                            com.example.util.AppHaptics.success(context)
+                            onExportMarkdown()
+                        }
+                        .padding(12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Download,
+                            contentDescription = "Export Markdown",
+                            tint = colors.accent1,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            text = "📄 EXPORT JOURNAL TO MARKDOWN (.MD)",
+                            color = colors.accent1,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 1.sp
+                        )
+                    }
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Export Dump
+                    // Export Raw JSON Dump
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -1056,10 +1101,10 @@ fun SettingsModal(
                                 imageVector = Icons.Default.Download,
                                 contentDescription = "Export Dump",
                                 tint = colors.textMain,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(18.dp)
                             )
                             Text(
-                                text = "EXPORT DUMP",
+                                text = "RAW JSON DUMP",
                                 color = colors.textMuted,
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
@@ -1087,7 +1132,7 @@ fun SettingsModal(
                                 imageVector = Icons.Default.Upload,
                                 contentDescription = "Import Dump",
                                 tint = colors.textMain,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(18.dp)
                             )
                             Text(
                                 text = "IMPORT DUMP",
@@ -1101,34 +1146,281 @@ fun SettingsModal(
                 }
             }
 
-            // === SECTION 3: DAEMONS_CONFIG ===
+            // === SECTION 3: MODULAR DAEMONS ENGINE ===
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    text = "DAEMONS_CONFIG",
-                    color = colors.textMuted,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
-                    letterSpacing = 1.5.sp
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "MODULAR DAEMONS (${daemons.size})",
+                        color = colors.textMuted,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 1.5.sp
+                    )
 
-                listOf("d1", "d2", "d3").forEach { key ->
-                    val daemon = daemons[key]
-                    if (daemon != null) {
-                        val dColor = Color(DAEMON_COLORS[key] ?: 0xFF06B6D4.toInt())
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(shapes.primary)
-                                .background(colors.bgPanel)
-                                .border(0.5.dp, colors.borderStrong.copy(alpha = 0.35f), shapes.primary)
-                                .padding(12.dp)
-                        ) {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                // Icon + Label
+                    Box(
+                        modifier = Modifier
+                            .clip(shapes.secondary)
+                            .background(colors.bgButtonActive)
+                            .border(0.5.dp, colors.accent1.copy(alpha = 0.6f), shapes.secondary)
+                            .clickable {
+                                isCreatingDaemon = !isCreatingDaemon
+                                com.example.util.AppHaptics.tick(context)
+                            }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = if (isCreatingDaemon) "CANCEL" else "+ NEW DAEMON",
+                            color = colors.accent1,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+
+                // New Daemon Creator Inline Card
+                if (isCreatingDaemon) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .cyberGlow(colors.accent1, (colors.glowLevel * 0.7f).toInt(), radius = 12.dp)
+                            .clip(shapes.primary)
+                            .background(colors.bgPanel)
+                            .border(1.dp, colors.accent1, shapes.primary)
+                            .padding(14.dp)
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(
+                                text = "CREATE NEW MODULAR DAEMON",
+                                color = colors.accent1,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+
+                            // Name Input
+                            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text(
+                                    text = "LABEL / IDENTIFIER",
+                                    color = colors.textMuted,
+                                    fontSize = 8.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                                BasicTextField(
+                                    value = newDaemonLabel,
+                                    onValueChange = { newDaemonLabel = it },
+                                    textStyle = TextStyle(
+                                        color = colors.textMain,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 12.sp
+                                    ),
+                                    cursorBrush = SolidColor(colors.accent1),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(shapes.secondary)
+                                        .background(colors.bgBase)
+                                        .border(0.5.dp, colors.borderStrong, shapes.secondary)
+                                        .padding(8.dp)
+                                )
+                            }
+
+                            // Type Switcher (Manual vs Hardware Sensor Steps)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "TRACKING MODE",
+                                    color = colors.textMuted,
+                                    fontSize = 8.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(shapes.secondary)
+                                            .background(if (newDaemonType == com.example.model.DaemonType.MANUAL) colors.bgButtonActive else colors.bgButton)
+                                            .border(0.5.dp, if (newDaemonType == com.example.model.DaemonType.MANUAL) colors.accent1 else colors.borderStrong.copy(alpha = 0.3f), shapes.secondary)
+                                            .clickable { newDaemonType = com.example.model.DaemonType.MANUAL }
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(
+                                            text = "MANUAL",
+                                            color = if (newDaemonType == com.example.model.DaemonType.MANUAL) colors.accent1 else colors.textMuted,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(shapes.secondary)
+                                            .background(if (newDaemonType == com.example.model.DaemonType.SENSOR_STEPS) colors.bgButtonActive else colors.bgButton)
+                                            .border(0.5.dp, if (newDaemonType == com.example.model.DaemonType.SENSOR_STEPS) colors.accent1 else colors.borderStrong.copy(alpha = 0.3f), shapes.secondary)
+                                            .clickable { newDaemonType = com.example.model.DaemonType.SENSOR_STEPS }
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(
+                                            text = "STEP SENSOR 🚶",
+                                            color = if (newDaemonType == com.example.model.DaemonType.SENSOR_STEPS) colors.accent1 else colors.textMuted,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Target & Step
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "DAILY TARGET",
+                                        color = colors.textMuted,
+                                        fontSize = 8.sp,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                    BasicTextField(
+                                        value = newDaemonMax,
+                                        onValueChange = { newDaemonMax = it },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        textStyle = TextStyle(
+                                            color = colors.textMain,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 11.sp
+                                        ),
+                                        cursorBrush = SolidColor(colors.accent1),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(shapes.secondary)
+                                            .background(colors.bgBase)
+                                            .border(0.5.dp, colors.borderStrong, shapes.secondary)
+                                            .padding(8.dp)
+                                    )
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "STEP (+)",
+                                        color = colors.textMuted,
+                                        fontSize = 8.sp,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                    BasicTextField(
+                                        value = newDaemonStep,
+                                        onValueChange = { newDaemonStep = it },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        textStyle = TextStyle(
+                                            color = colors.textMain,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 11.sp
+                                        ),
+                                        cursorBrush = SolidColor(colors.accent1),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(shapes.secondary)
+                                            .background(colors.bgBase)
+                                            .border(0.5.dp, colors.borderStrong, shapes.secondary)
+                                            .padding(8.dp)
+                                    )
+                                }
+                            }
+
+                            // Icon Selector
+                            Text(
+                                text = "ICON",
+                                color = colors.textMuted,
+                                fontSize = 8.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                AVAILABLE_DAEMON_ICONS.forEach { iName ->
+                                    val isSel = newDaemonIcon == iName
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(shapes.secondary)
+                                            .background(if (isSel) colors.bgButtonActive else colors.bgButton)
+                                            .border(0.5.dp, if (isSel) colors.accent1 else colors.borderStrong.copy(alpha = 0.3f), shapes.secondary)
+                                            .clickable { newDaemonIcon = iName },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        DaemonIcon(
+                                            name = iName,
+                                            tint = if (isSel) colors.accent1 else colors.textMuted,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Create Button
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(shapes.secondary)
+                                    .background(colors.accentBrush)
+                                    .clickable {
+                                        val label = newDaemonLabel.trim().ifBlank { "DAEMON" }
+                                        val max = newDaemonMax.toIntOrNull() ?: 100
+                                        val step = newDaemonStep.toIntOrNull() ?: 1
+                                        onAddDaemon(label, max, step, newDaemonIcon, newDaemonType, null)
+                                        isCreatingDaemon = false
+                                        newDaemonLabel = ""
+                                        newDaemonMax = "100"
+                                        newDaemonStep = "1"
+                                    }
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "DEPLOY DAEMON",
+                                    color = colors.bgBase,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Render Dynamic Daemon Cards
+                daemons.values.forEach { daemon ->
+                    val key = daemon.key
+                    val dColor = com.example.model.getDaemonColor(key, true, daemon.colorHex)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(shapes.primary)
+                            .background(colors.bgPanel)
+                            .border(0.5.dp, colors.borderStrong.copy(alpha = 0.35f), shapes.primary)
+                            .padding(12.dp)
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            // Header: Icon + Label + Type Badge + Delete
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.weight(1f)
                                 ) {
                                     DaemonIcon(
                                         name = daemon.iconName,
@@ -1146,114 +1438,166 @@ fun SettingsModal(
                                         ),
                                         cursorBrush = SolidColor(colors.accent1),
                                         modifier = Modifier
-                                            .fillMaxWidth()
+                                            .weight(1f)
                                             .border(0.5.dp, colors.borderStrong.copy(alpha = 0.35f), shapes.secondary)
                                             .padding(6.dp)
                                     )
                                 }
 
-                                // Icon selector row
-                                Text(
-                                    text = "ICON SELECTOR",
-                                    color = colors.accent1,
-                                    fontSize = 8.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace
-                                )
                                 Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .horizontalScroll(rememberScrollState()),
+                                    verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
-                                    AVAILABLE_DAEMON_ICONS.forEach { iName ->
-                                        val isSel = daemon.iconName == iName
+                                    // Tracking Type Toggle Badge
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(shapes.secondary)
+                                            .background(colors.bgButton)
+                                            .border(0.5.dp, colors.borderStrong.copy(alpha = 0.3f), shapes.secondary)
+                                            .clickable {
+                                                val nextType = if (daemon.type == com.example.model.DaemonType.MANUAL)
+                                                    com.example.model.DaemonType.SENSOR_STEPS
+                                                else
+                                                    com.example.model.DaemonType.MANUAL
+                                                onUpdateDaemonFull(daemon.copy(type = nextType))
+                                                com.example.util.AppHaptics.tick(context)
+                                            }
+                                            .padding(horizontal = 6.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(
+                                            text = if (daemon.type == com.example.model.DaemonType.SENSOR_STEPS) "🚶 SENSOR" else "👆 MANUAL",
+                                            color = if (daemon.type == com.example.model.DaemonType.SENSOR_STEPS) colors.accent1 else colors.textMuted,
+                                            fontSize = 8.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                    }
+
+                                    // Delete Button (if more than 1 daemon exists)
+                                    if (daemons.size > 1) {
                                         Box(
                                             modifier = Modifier
-                                                .size(30.dp)
+                                                .size(24.dp)
                                                 .clip(shapes.secondary)
-                                                .background(if (isSel) colors.bgButtonActive else colors.bgButton)
-                                                .border(
-                                                    0.5.dp,
-                                                    if (isSel) colors.accent1 else colors.borderStrong.copy(alpha = 0.35f),
-                                                    shapes.secondary
-                                                )
+                                                .background(colors.bgButton)
+                                                .border(0.5.dp, Color.Red.copy(alpha = 0.4f), shapes.secondary)
                                                 .clickable {
-                                                    onUpdateDaemon(key, null, null, null, iName)
+                                                    onDeleteDaemon(key)
                                                 },
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            DaemonIcon(
-                                                name = iName,
-                                                tint = if (isSel) dColor else colors.textMuted,
-                                                modifier = Modifier.size(14.dp)
+                                            Icon(
+                                                imageVector = Icons.Default.Close,
+                                                contentDescription = "Delete Daemon",
+                                                tint = Color.Red.copy(alpha = 0.8f),
+                                                modifier = Modifier.size(12.dp)
                                             )
                                         }
                                     }
                                 }
+                            }
 
-                                // Max Value & Step Row
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = "MAX VALUE",
-                                            color = colors.textMuted,
-                                            fontSize = 8.sp,
-                                            fontFamily = FontFamily.Monospace
-                                        )
-                                        BasicTextField(
-                                            value = daemon.max.toString(),
-                                            onValueChange = {
-                                                val n = it.toIntOrNull()
-                                                if (n != null) onUpdateDaemon(key, null, n, null, null)
+                            // Icon selector row
+                            Text(
+                                text = "ICON SELECTOR",
+                                color = colors.accent1,
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                AVAILABLE_DAEMON_ICONS.forEach { iName ->
+                                    val isSel = daemon.iconName == iName
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(shapes.secondary)
+                                            .background(if (isSel) colors.bgButtonActive else colors.bgButton)
+                                            .border(
+                                                0.5.dp,
+                                                if (isSel) colors.accent1 else colors.borderStrong.copy(alpha = 0.35f),
+                                                shapes.secondary
+                                            )
+                                            .clickable {
+                                                onUpdateDaemon(key, null, null, null, iName)
                                             },
-                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                            textStyle = TextStyle(
-                                                color = colors.textMain,
-                                                fontFamily = FontFamily.Monospace,
-                                                fontSize = 11.sp
-                                            ),
-                                            cursorBrush = SolidColor(colors.accent1),
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clip(shapes.secondary)
-                                                .background(colors.bgButton)
-                                                .border(0.5.dp, colors.borderStrong.copy(alpha = 0.35f), shapes.secondary)
-                                                .padding(6.dp)
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        DaemonIcon(
+                                            name = iName,
+                                            tint = if (isSel) dColor else colors.textMuted,
+                                            modifier = Modifier.size(14.dp)
                                         )
                                     }
+                                }
+                            }
 
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = "STEP (+ PER CLICK)",
-                                            color = colors.textMuted,
-                                            fontSize = 8.sp,
-                                            fontFamily = FontFamily.Monospace
-                                        )
-                                        BasicTextField(
-                                            value = daemon.step.toString(),
-                                            onValueChange = {
-                                                val n = it.toIntOrNull()
-                                                if (n != null) onUpdateDaemon(key, null, null, n, null)
-                                            },
-                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                            textStyle = TextStyle(
-                                                color = colors.textMain,
-                                                fontFamily = FontFamily.Monospace,
-                                                fontSize = 11.sp
-                                            ),
-                                            cursorBrush = SolidColor(colors.accent1),
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clip(shapes.secondary)
-                                                .background(colors.bgButton)
-                                                .border(0.5.dp, colors.borderStrong.copy(alpha = 0.35f), shapes.secondary)
-                                                .padding(6.dp)
-                                        )
-                                    }
+                            // Max Value & Step Row
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "MAX VALUE",
+                                        color = colors.textMuted,
+                                        fontSize = 8.sp,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                    BasicTextField(
+                                        value = daemon.max.toString(),
+                                        onValueChange = {
+                                            val n = it.toIntOrNull()
+                                            if (n != null) onUpdateDaemon(key, null, n, null, null)
+                                        },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        textStyle = TextStyle(
+                                            color = colors.textMain,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 11.sp
+                                        ),
+                                        cursorBrush = SolidColor(colors.accent1),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(shapes.secondary)
+                                            .background(colors.bgButton)
+                                            .border(0.5.dp, colors.borderStrong.copy(alpha = 0.35f), shapes.secondary)
+                                            .padding(6.dp)
+                                    )
+                                }
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "STEP (+ PER CLICK)",
+                                        color = colors.textMuted,
+                                        fontSize = 8.sp,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                    BasicTextField(
+                                        value = daemon.step.toString(),
+                                        onValueChange = {
+                                            val n = it.toIntOrNull()
+                                            if (n != null) onUpdateDaemon(key, null, null, n, null)
+                                        },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        textStyle = TextStyle(
+                                            color = colors.textMain,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 11.sp
+                                        ),
+                                        cursorBrush = SolidColor(colors.accent1),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(shapes.secondary)
+                                            .background(colors.bgButton)
+                                            .border(0.5.dp, colors.borderStrong.copy(alpha = 0.35f), shapes.secondary)
+                                            .padding(6.dp)
+                                    )
                                 }
                             }
                         }

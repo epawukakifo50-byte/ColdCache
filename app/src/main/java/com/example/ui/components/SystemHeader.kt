@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
@@ -44,6 +45,7 @@ fun SystemHeader(
     hasArchiveItems: Boolean,
     onManualClick: () -> Unit,
     onArchiveClick: () -> Unit,
+    onMatrixClick: () -> Unit = {},
     onSettingsClick: () -> Unit,
     onSafeModeClick: () -> Unit,
     onDaemonClick: (String) -> Unit
@@ -161,6 +163,28 @@ fun SystemHeader(
                                 .background(colors.accent1)
                         )
                     }
+                }
+
+                // Data Matrix Heatmap Button
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(shapes.secondary)
+                        .background(colors.bgButton)
+                        .border(0.5.dp, colors.borderStrong.copy(alpha = 0.4f), shapes.secondary)
+                        .clickable {
+                            com.example.util.AppHaptics.click(context)
+                            onMatrixClick()
+                        }
+                        .testTag("header_matrix_button"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.GridView,
+                        contentDescription = "Data Matrix",
+                        tint = colors.textMuted,
+                        modifier = Modifier.size(15.dp)
+                    )
                 }
 
                 // Settings Button

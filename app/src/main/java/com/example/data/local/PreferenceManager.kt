@@ -9,7 +9,7 @@ import java.util.Date
 import java.util.Locale
 
 class PreferenceManager(context: Context) {
-    private val prefs: SharedPreferences = context.getSharedPreferences("coldcache_prefs", Context.MODE_PRIVATE)
+    val prefs: SharedPreferences = context.getSharedPreferences("coldcache_prefs", Context.MODE_PRIVATE)
 
     fun loadSystemConfig(): SystemConfig {
         val colorMode = try {
@@ -17,8 +17,8 @@ class PreferenceManager(context: Context) {
         } catch (_: Exception) { ColorMode.DARK }
 
         val sensoryTheme = try {
-            SensoryTheme.valueOf(prefs.getString("cc_sensory_theme", SensoryTheme.CYBER_NEON.name) ?: SensoryTheme.CYBER_NEON.name)
-        } catch (_: Exception) { SensoryTheme.CYBER_NEON }
+            SensoryTheme.valueOf(prefs.getString("cc_sensory_theme", SensoryTheme.ORIGINAL_STEEL.name) ?: SensoryTheme.ORIGINAL_STEEL.name)
+        } catch (_: Exception) { SensoryTheme.ORIGINAL_STEEL }
 
         val terminology = try {
             Terminology.valueOf(prefs.getString("cc_term", Terminology.SYSTEM.name) ?: Terminology.SYSTEM.name)
@@ -32,8 +32,8 @@ class PreferenceManager(context: Context) {
             ColorStyle.valueOf(prefs.getString("cc_color_style", ColorStyle.FLAT.name) ?: ColorStyle.FLAT.name)
         } catch (_: Exception) { ColorStyle.FLAT }
 
-        val accent1 = prefs.getString("cc_accent1", "#06b6d4") ?: "#06b6d4"
-        val accent2 = prefs.getString("cc_accent2", "#a855f7") ?: "#a855f7"
+        val accent1 = prefs.getString("cc_accent1", "#a3e635") ?: "#a3e635"
+        val accent2 = prefs.getString("cc_accent2", "#64748b") ?: "#64748b"
         val glowLevel = prefs.getInt("cc_glow", 20)
         val daemonShadeTracker = prefs.getBoolean("cc_daemon_shade", true)
         val taskRemindersEnabled = prefs.getBoolean("cc_task_reminders", true)
@@ -93,22 +93,22 @@ class PreferenceManager(context: Context) {
 
         val daemons = try {
             val root = JSONObject(savedJson)
-            val result = mutableMapOf<String, Daemon>()
-            for (key in listOf("d1", "d2", "d3")) {
-                val defaultD = DEFAULT_DAEMONS[key]!!
-                if (root.has(key)) {
-                    val obj = root.getJSONObject(key)
-                    val label = obj.optString("label", defaultD.label)
-                    val max = obj.optInt("max", defaultD.max)
-                    val step = obj.optInt("step", defaultD.step)
-                    val iconName = obj.optString("iconName", defaultD.iconName)
-                    val current = if (isNewDay) 0 else obj.optInt("current", 0)
-                    result[key] = Daemon(key, label, current, max, step, iconName)
-                } else {
-                    result[key] = defaultD
-                }
+            val result = linkedMapOf<String, Daemon>()
+            val keys = root.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                val obj = root.getJSONObject(key)
+                val label = obj.optString("label", "DAEMON")
+                val max = obj.optInt("max", 100)
+                val step = obj.optInt("step", 1)
+                val iconName = obj.optString("iconName", "SquareActivity")
+                val typeName = obj.optString("type", DaemonType.MANUAL.name)
+                val type = try { DaemonType.valueOf(typeName) } catch (_: Exception) { DaemonType.MANUAL }
+                val colorHex = if (obj.has("colorHex") && !obj.isNull("colorHex")) obj.getString("colorHex") else null
+                val current = if (isNewDay) 0 else obj.optInt("current", 0)
+                result[key] = Daemon(key, label, current, max, step, iconName, type, colorHex)
             }
-            result
+            if (result.isEmpty()) DEFAULT_DAEMONS else result
         } catch (_: Exception) {
             DEFAULT_DAEMONS
         }
@@ -118,6 +118,26 @@ class PreferenceManager(context: Context) {
         }
 
         return daemons
+    }
+
+    fun saveDaemons(daemons: Map<String, Daemon>) {
+        try {
+            val root = JSONObject()
+            for ((k, d) in daemons) {
+                val obj = JSONObject().apply {
+                    put("key", d.key)
+                    put("label", d.label)
+                    put("current", d.current)
+                    put("max", d.max)
+                    put("step", d.step)
+                    put("iconName", d.iconName)
+                    put("type", d.type.name)
+                    put("colorHex", d.colorHex)
+                }
+                root.put(k, obj)
+            }
+            prefs.edit().putString("cc_daemons", root.toString()).apply()
+        } catch (_: Exception) {}
     }
 
     fun resetDailyDaemons(): Map<String, Daemon> {
@@ -135,20 +155,6 @@ class PreferenceManager(context: Context) {
 
     fun unregisterChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {
         prefs.unregisterOnSharedPreferenceChangeListener(listener)
-    }
-
-    fun saveDaemons(daemons: Map<String, Daemon>) {
-        val root = JSONObject()
-        for ((key, d) in daemons) {
-            val obj = JSONObject()
-            obj.put("label", d.label)
-            obj.put("current", d.current)
-            obj.put("max", d.max)
-            obj.put("step", d.step)
-            obj.put("iconName", d.iconName)
-            root.put(key, obj)
-        }
-        prefs.edit().putString("cc_daemons", root.toString()).apply()
     }
 
     fun loadSystemState(): AppSystemState {

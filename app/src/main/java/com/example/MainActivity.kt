@@ -96,6 +96,7 @@ class MainActivity : ComponentActivity() {
             val isTemporalOpen by viewModel.isTemporalOpen.collectAsState()
             val isLogOpen by viewModel.isLogOpen.collectAsState()
             val isSettingsOpen by viewModel.isSettingsOpen.collectAsState()
+            val isMatrixOpen by viewModel.isMatrixOpen.collectAsState()
             val isManualOpen by viewModel.isManualOpen.collectAsState()
             val schedulingTask by viewModel.schedulingTask.collectAsState()
             val ramOverflowTask by viewModel.ramOverflowTask.collectAsState()
@@ -165,6 +166,7 @@ class MainActivity : ComponentActivity() {
                                 isBufferOpen = isBufferOpen,
                                 isTemporalOpen = isTemporalOpen,
                                 isLogOpen = isLogOpen,
+                                isMatrixOpen = isMatrixOpen,
                                 isSettingsOpen = isSettingsOpen,
                                 isManualOpen = isManualOpen,
                                 schedulingTask = schedulingTask,

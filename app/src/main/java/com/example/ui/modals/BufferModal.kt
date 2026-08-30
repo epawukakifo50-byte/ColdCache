@@ -11,8 +11,14 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import android.app.Activity
+import android.content.Intent
+import android.speech.RecognizerIntent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Terminal
@@ -56,6 +62,17 @@ fun BufferModal(
     val shapes = LocalColdCacheShapes.current
     val context = androidx.compose.ui.platform.LocalContext.current
     var newTaskInput by remember { mutableStateOf("") }
+
+    val speechLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val spoken = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+            if (!spoken.isNullOrBlank()) {
+                newTaskInput = if (newTaskInput.isBlank()) spoken else "$newTaskInput $spoken"
+            }
+        }
+    }
 
     val displayTasks = if (isReversed) tasks else tasks.reversed()
 
@@ -167,6 +184,32 @@ fun BufferModal(
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("buffer_inject_input")
+                )
+            }
+
+            // Voice Dictation Button
+            Box(
+                modifier = Modifier
+                    .clip(shapes.secondary)
+                    .background(colors.bgButton)
+                    .border(0.5.dp, colors.accent1.copy(alpha = 0.5f), shapes.secondary)
+                    .clickable {
+                        val speechIntent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                            putExtra(RecognizerIntent.EXTRA_PROMPT, "Надиктуйте задачу в Buffer...")
+                        }
+                        try {
+                            speechLauncher.launch(speechIntent)
+                        } catch (_: Exception) {}
+                    }
+                    .padding(horizontal = 7.dp, vertical = 5.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Mic,
+                    contentDescription = "Voice Input",
+                    tint = colors.accent1,
+                    modifier = Modifier.size(15.dp)
                 )
             }
 

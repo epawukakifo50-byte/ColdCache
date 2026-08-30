@@ -8,6 +8,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <application
         android:allowBackup="true"
@@ -30,13 +32,31 @@
             </intent-filter>
         </activity>
 
-        <!-- Rapid 1-line Buffer Dump Floating Dialog -->
+        <!-- Rapid 1-line Buffer Dump Floating Dialog and System Share Handler -->
         <activity
             android:name=".QuickBufferActivity"
             android:exported="true"
-            android:label="Dump to Buffer"
+            android:label="ColdCache Buffer"
             android:theme="@style/Theme.MyApplication"
-            android:windowSoftInputMode="stateVisible|adjustResize" />
+            android:windowSoftInputMode="stateVisible|adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+
+        <!-- Quick Settings Tile for 1-click buffer capture -->
+        <service
+            android:name=".service.ColdCacheTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_coldcache_logo"
+            android:label="+ Буфер"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
 
         <!-- Ongoing Foreground Service for Daemon Tracking in Notification Shade -->
         <service

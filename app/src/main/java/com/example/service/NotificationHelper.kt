@@ -85,14 +85,15 @@ object NotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // Quick daemon action intents
-        val d1 = daemons["d1"] ?: DEFAULT_DAEMONS["d1"] ?: Daemon("d1", "Шаги", 0, 10000, 1000, "SquareActivity")
-        val d2 = daemons["d2"] ?: DEFAULT_DAEMONS["d2"] ?: Daemon("d2", "Вода", 0, 2000, 250, "Droplet")
-        val d3 = daemons["d3"] ?: DEFAULT_DAEMONS["d3"] ?: Daemon("d3", "Сон", 0, 1, 1, "Battery")
+        // Quick daemon action intents dynamically mapped
+        val daemonList = daemons.values.toList()
+        val d1 = daemonList.getOrNull(0) ?: Daemon("d1", "KINEMATICS", 0, 10000, 1000, "SquareActivity")
+        val d2 = daemonList.getOrNull(1) ?: Daemon("d2", "COOLANT", 0, 2000, 250, "Droplet")
+        val d3 = daemonList.getOrNull(2) ?: Daemon("d3", "HARDWARE", 0, 1, 1, "Battery")
 
         val d1Intent = Intent(context, DaemonActionReceiver::class.java).apply {
             action = DaemonActionReceiver.ACTION_INTERACT_DAEMON
-            putExtra(DaemonActionReceiver.EXTRA_DAEMON_KEY, "d1")
+            putExtra(DaemonActionReceiver.EXTRA_DAEMON_KEY, d1.key)
         }
         val d1PendingIntent = PendingIntent.getBroadcast(
             context,
@@ -103,7 +104,7 @@ object NotificationHelper {
 
         val d2Intent = Intent(context, DaemonActionReceiver::class.java).apply {
             action = DaemonActionReceiver.ACTION_INTERACT_DAEMON
-            putExtra(DaemonActionReceiver.EXTRA_DAEMON_KEY, "d2")
+            putExtra(DaemonActionReceiver.EXTRA_DAEMON_KEY, d2.key)
         }
         val d2PendingIntent = PendingIntent.getBroadcast(
             context,
@@ -114,7 +115,7 @@ object NotificationHelper {
 
         val d3Intent = Intent(context, DaemonActionReceiver::class.java).apply {
             action = DaemonActionReceiver.ACTION_INTERACT_DAEMON
-            putExtra(DaemonActionReceiver.EXTRA_DAEMON_KEY, "d3")
+            putExtra(DaemonActionReceiver.EXTRA_DAEMON_KEY, d3.key)
         }
         val d3PendingIntent = PendingIntent.getBroadcast(
             context,
@@ -123,8 +124,8 @@ object NotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val totalReady = listOf(d1, d2, d3).count { it.current >= it.max }
-        val syncSummary = "SYNC: $totalReady/3"
+        val totalReady = daemonList.count { it.current >= it.max }
+        val syncSummary = "SYNC: $totalReady/${daemonList.size}"
 
         // === Custom RemoteViews for EXPANDED notification ===
         val expandedViews = com.example.R.layout.notification_daemon_expanded.let {

@@ -44,6 +44,7 @@ fun MainDashboardScreen(
     isBufferOpen: Boolean,
     isTemporalOpen: Boolean,
     isLogOpen: Boolean,
+    isMatrixOpen: Boolean,
     isSettingsOpen: Boolean,
     isManualOpen: Boolean,
     schedulingTask: Task?,
@@ -85,6 +86,7 @@ fun MainDashboardScreen(
                 hasArchiveItems = renderLog.isNotEmpty(),
                 onManualClick = { viewModel.openManual(true) },
                 onArchiveClick = { viewModel.openLog(true) },
+                onMatrixClick = { viewModel.openMatrix(true) },
                 onSettingsClick = { viewModel.openSettings(true) },
                 onSafeModeClick = { viewModel.setSystemState(AppSystemState.SAFE_MODE) },
                 onDaemonClick = { viewModel.interactDaemon(it) }
@@ -266,6 +268,17 @@ fun MainDashboardScreen(
         }
 
         AnimatedVisibility(
+            visible = isMatrixOpen,
+            enter = modalEnter,
+            exit = modalExit
+        ) {
+            ActivityMatrixModal(
+                renderLog = renderLog,
+                onClose = { viewModel.openMatrix(false) }
+            )
+        }
+
+        AnimatedVisibility(
             visible = isSettingsOpen,
             enter = modalEnter,
             exit = modalExit
@@ -277,8 +290,18 @@ fun MainDashboardScreen(
                 onUpdateDaemon = { key, label, max, step, icon ->
                     viewModel.updateDaemonConfig(key, label, max, step, icon)
                 },
+                onAddDaemon = { label, max, step, icon, type, color ->
+                    viewModel.addCustomDaemon(label, max, step, icon, type, color)
+                },
+                onDeleteDaemon = { key ->
+                    viewModel.deleteCustomDaemon(key)
+                },
+                onUpdateDaemonFull = { daemon ->
+                    viewModel.updateDaemonFull(daemon)
+                },
                 onExportDump = { viewModel.exportMemoryDumpJson() },
                 onImportDump = { viewModel.importMemoryDumpJson(it) },
+                onExportMarkdown = { viewModel.exportMarkdownJournal() },
                 onClose = { viewModel.openSettings(false) }
             )
         }

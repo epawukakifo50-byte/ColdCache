@@ -66,6 +66,40 @@ fun CompilingScreen(
 
     var isFinishing by remember { mutableStateOf(false) }
 
+    // Cyber Sprint Pomodoro Timer State
+    var sprintMinutes by remember { mutableStateOf<Int?>(null) }
+    var secondsRemaining by remember { mutableStateOf(0) }
+    var isTimerRunning by remember { mutableStateOf(false) }
+    var showSprintFinishedDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isTimerRunning, sprintMinutes, secondsRemaining) {
+        if (isTimerRunning && sprintMinutes != null && secondsRemaining > 0) {
+            delay(1000)
+            secondsRemaining -= 1
+            if (secondsRemaining == 0) {
+                isTimerRunning = false
+                showSprintFinishedDialog = true
+                com.example.util.AppHaptics.success(context)
+            }
+        }
+    }
+
+    fun startSprint(minutes: Int) {
+        sprintMinutes = minutes
+        secondsRemaining = minutes * 60
+        isTimerRunning = true
+        showSprintFinishedDialog = false
+        com.example.util.AppHaptics.snap(context)
+    }
+
+    fun setFreeFlow() {
+        sprintMinutes = null
+        secondsRemaining = 0
+        isTimerRunning = false
+        showSprintFinishedDialog = false
+        com.example.util.AppHaptics.snap(context)
+    }
+
     LaunchedEffect(isFinishing) {
         if (isFinishing) {
             com.example.util.AppHaptics.success(context)
@@ -285,6 +319,154 @@ fun CompilingScreen(
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace
                         )
+                    }
+
+                    // Cyber Sprint Pomodoro Bar
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(shapes.secondary)
+                            .background(colors.bgBase)
+                            .border(0.5.dp, colors.borderStrong.copy(alpha = 0.35f), shapes.secondary)
+                            .padding(6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Free Flow vs Sprints
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            val isFlow = sprintMinutes == null
+                            Box(
+                                modifier = Modifier
+                                    .clip(shapes.secondary)
+                                    .background(if (isFlow) colors.bgButtonActive else colors.bgButton)
+                                    .border(0.5.dp, if (isFlow) colors.accent1 else colors.borderStrong.copy(alpha = 0.25f), shapes.secondary)
+                                    .clickable { setFreeFlow() }
+                                    .padding(horizontal = 7.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = "FLOW",
+                                    color = if (isFlow) colors.accent1 else colors.textMuted,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+
+                            listOf(15, 25, 45, 60).forEach { mins ->
+                                val isSel = sprintMinutes == mins
+                                Box(
+                                    modifier = Modifier
+                                        .clip(shapes.secondary)
+                                        .background(if (isSel) colors.bgButtonActive else colors.bgButton)
+                                        .border(0.5.dp, if (isSel) colors.accent1 else colors.borderStrong.copy(alpha = 0.25f), shapes.secondary)
+                                        .clickable { startSprint(mins) }
+                                        .padding(horizontal = 6.dp, vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        text = "${mins}M",
+                                        color = if (isSel) colors.accent1 else colors.textMuted,
+                                        fontSize = 9.sp,
+                                        fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                            }
+                        }
+
+                        // Countdown display
+                        if (sprintMinutes != null) {
+                            val min = secondsRemaining / 60
+                            val sec = secondsRemaining % 60
+                            val timeFormatted = String.format("%02d:%02d", min, sec)
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.clickable {
+                                    isTimerRunning = !isTimerRunning
+                                    com.example.util.AppHaptics.tick(context)
+                                }
+                            ) {
+                                Text(
+                                    text = timeFormatted,
+                                    color = if (secondsRemaining <= 60 && secondsRemaining > 0) Color.Red else colors.accent1,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                                Icon(
+                                    imageVector = if (isTimerRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                    contentDescription = "Toggle Timer",
+                                    tint = colors.accent1,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    // Sprint Completed Alert Banner
+                    if (showSprintFinishedDialog) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .cyberGlow(colors.accent1, colors.glowLevel, radius = 10.dp)
+                                .clip(shapes.secondary)
+                                .background(colors.bgButtonActive)
+                                .border(1.dp, colors.accent1, shapes.secondary)
+                                .padding(10.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "🎉 SPRINT COMPLETE",
+                                    color = colors.accent1,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(shapes.secondary)
+                                            .background(colors.bgButton)
+                                            .border(0.5.dp, colors.borderStrong, shapes.secondary)
+                                            .clickable {
+                                                secondsRemaining += 300
+                                                isTimerRunning = true
+                                                showSprintFinishedDialog = false
+                                                com.example.util.AppHaptics.tick(context)
+                                            }
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(
+                                            text = "+5 MIN",
+                                            color = colors.textMain,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(shapes.secondary)
+                                            .background(colors.accentBrush)
+                                            .clickable { isFinishing = true }
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(
+                                            text = "FINISH",
+                                            color = colors.bgBase,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     // Task Title
