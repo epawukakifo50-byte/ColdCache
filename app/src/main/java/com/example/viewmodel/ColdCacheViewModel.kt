@@ -18,6 +18,18 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+class OrderedDaemonMap(
+    val map: Map<String, Daemon>,
+    val version: Long = System.nanoTime()
+) : Map<String, Daemon> by map {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is OrderedDaemonMap) return false
+        return version == other.version && map.keys.toList() == other.map.keys.toList()
+    }
+    override fun hashCode(): Int = version.hashCode()
+}
+
 class ColdCacheViewModel(
     private val repository: TaskRepository,
     private val prefManager: PreferenceManager,
@@ -28,7 +40,7 @@ class ColdCacheViewModel(
     private val _systemConfig = MutableStateFlow(prefManager.loadSystemConfig())
     val systemConfig: StateFlow<SystemConfig> = _systemConfig.asStateFlow()
 
-    private val _daemons = MutableStateFlow(prefManager.loadDaemons())
+    private val _daemons = MutableStateFlow<Map<String, Daemon>>(OrderedDaemonMap(prefManager.loadDaemons()))
     val daemons: StateFlow<Map<String, Daemon>> = _daemons.asStateFlow()
 
     private val _systemState = MutableStateFlow(prefManager.loadSystemState())
@@ -76,6 +88,13 @@ class ColdCacheViewModel(
     private val _isManualOpen = MutableStateFlow(false)
     val isManualOpen: StateFlow<Boolean> = _isManualOpen.asStateFlow()
 
+    private val _selectedHeatmapDaemon = MutableStateFlow<Daemon?>(null)
+    val selectedHeatmapDaemon: StateFlow<Daemon?> = _selectedHeatmapDaemon.asStateFlow()
+
+    fun openDaemonHeatmap(daemon: Daemon?) {
+        _selectedHeatmapDaemon.value = daemon
+    }
+
     private val _schedulingTask = MutableStateFlow<Task?>(null)
     val schedulingTask: StateFlow<Task?> = _schedulingTask.asStateFlow()
 
@@ -99,8 +118,8 @@ class ColdCacheViewModel(
 
     private val prefChangeListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         when (key) {
-            "cc_daemons", "cc_date" -> {
-                _daemons.value = prefManager.loadDaemons()
+            "cc_daemons", "cc_daemons_array", "cc_date" -> {
+                _daemons.value = OrderedDaemonMap(prefManager.loadDaemons(), System.nanoTime())
             }
             "cc_mode", "cc_sensory_theme", "cc_term", "cc_shape", "cc_color_style",
             "cc_accent1", "cc_accent2", "cc_glow", "cc_daemon_shade", "cc_task_reminders",
@@ -201,7 +220,7 @@ class ColdCacheViewModel(
         val d = currentDaemons[key] ?: return
         val newCurrent = if (d.current >= d.max) 0 else minOf(d.max, d.current + d.step)
         currentDaemons[key] = d.copy(current = newCurrent)
-        _daemons.value = currentDaemons
+        _daemons.value = OrderedDaemonMap(currentDaemons)
         prefManager.saveDaemons(currentDaemons)
         syncExternalViews()
         com.example.util.AppHaptics.tick(appContext, _systemConfig.value.hapticFeedbackEnabled)
@@ -209,10 +228,38 @@ class ColdCacheViewModel(
 
     private val stepSensorManager = com.example.sensor.StepSensorManager(appContext).apply {
         onStepsUpdated = {
-            _daemons.value = prefManager.loadDaemons()
+            _daemons.value = OrderedDaemonMap(prefManager.loadDaemons())
             syncExternalViews()
         }
         startListening()
+    }
+
+    val healthSyncManager = com.example.sensor.HealthSyncManager(appContext)
+
+    fun syncWithHealthConnect(onComplete: ((Boolean, Long?) -> Unit)? = null) {
+        viewModelScope.launch {
+            android.util.Log.d("ColdCache", "Syncing with Health Connect...")
+            val steps = healthSyncManager.getTodayStepsFromHealth()
+            android.util.Log.d("ColdCache", "Health Connect steps result: $steps")
+            if (steps != null) {
+                // steps can be 0 (valid — no steps recorded yet today)
+                val currentDaemons = _daemons.value.toMutableMap()
+                currentDaemons.forEach { (key, daemon) ->
+                    if (daemon.type == DaemonType.SENSOR_STEPS) {
+                        currentDaemons[key] = daemon.copy(current = steps.toInt())
+                    }
+                }
+                _daemons.value = OrderedDaemonMap(currentDaemons)
+                prefManager.saveDaemons(currentDaemons)
+                syncExternalViews()
+                com.example.util.AppHaptics.success(appContext, _systemConfig.value.hapticFeedbackEnabled)
+                onComplete?.invoke(true, steps)
+            } else {
+                android.util.Log.w("ColdCache", "Health Connect returned null (no permission or not available)")
+                com.example.util.AppHaptics.tick(appContext, _systemConfig.value.hapticFeedbackEnabled)
+                onComplete?.invoke(false, null)
+            }
+        }
     }
 
     fun addCustomDaemon(label: String, max: Int, step: Int, iconName: String, type: DaemonType = DaemonType.MANUAL, colorHex: String? = null) {
@@ -231,7 +278,7 @@ class ColdCacheViewModel(
             colorHex = assignedColor
         )
         currentDaemons[newKey] = newDaemon
-        _daemons.value = currentDaemons
+        _daemons.value = OrderedDaemonMap(currentDaemons)
         prefManager.saveDaemons(currentDaemons)
         syncExternalViews()
         com.example.util.AppHaptics.success(appContext, _systemConfig.value.hapticFeedbackEnabled)
@@ -240,7 +287,7 @@ class ColdCacheViewModel(
     fun deleteCustomDaemon(key: String) {
         val currentDaemons = _daemons.value.toMutableMap()
         currentDaemons.remove(key)
-        _daemons.value = currentDaemons
+        _daemons.value = OrderedDaemonMap(currentDaemons)
         prefManager.saveDaemons(currentDaemons)
         syncExternalViews()
         com.example.util.AppHaptics.snap(appContext, _systemConfig.value.hapticFeedbackEnabled)
@@ -249,7 +296,7 @@ class ColdCacheViewModel(
     fun updateDaemonFull(daemon: Daemon) {
         val currentDaemons = _daemons.value.toMutableMap()
         currentDaemons[daemon.key] = daemon
-        _daemons.value = currentDaemons
+        _daemons.value = OrderedDaemonMap(currentDaemons)
         prefManager.saveDaemons(currentDaemons)
         syncExternalViews()
     }
@@ -264,7 +311,7 @@ class ColdCacheViewModel(
         list.add(targetIndex, item)
         val orderedMap = linkedMapOf<String, Daemon>()
         list.forEach { orderedMap[it.key] = it }
-        _daemons.value = orderedMap
+        _daemons.value = OrderedDaemonMap(orderedMap)
         prefManager.saveDaemons(orderedMap)
         syncExternalViews()
         com.example.util.AppHaptics.tick(appContext, _systemConfig.value.hapticFeedbackEnabled)
@@ -281,7 +328,7 @@ class ColdCacheViewModel(
             type = type ?: d.type,
             colorHex = colorHex ?: d.colorHex
         )
-        _daemons.value = currentDaemons
+        _daemons.value = OrderedDaemonMap(currentDaemons)
         prefManager.saveDaemons(currentDaemons)
         syncExternalViews()
     }
@@ -505,6 +552,7 @@ class ColdCacheViewModel(
     fun toggleBufferReversed() { _isBufferReversed.value = !_isBufferReversed.value }
 
     fun closeAllModals(): Boolean {
+        if (_selectedHeatmapDaemon.value != null) { _selectedHeatmapDaemon.value = null; return true }
         if (_schedulingTask.value != null) { _schedulingTask.value = null; return true }
         if (_ramOverflowTask.value != null) { _ramOverflowTask.value = null; return true }
         if (_isBufferOpen.value) { _isBufferOpen.value = false; return true }

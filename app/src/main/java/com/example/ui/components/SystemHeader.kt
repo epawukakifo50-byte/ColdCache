@@ -6,6 +6,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -41,6 +42,7 @@ import com.example.ui.theme.LocalColdCacheColors
 import com.example.ui.theme.LocalColdCacheShapes
 import com.example.ui.theme.cyberGlow
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun SystemHeader(
     daemons: Map<String, Daemon>,
@@ -50,7 +52,8 @@ fun SystemHeader(
     onMatrixClick: () -> Unit = {},
     onSettingsClick: () -> Unit,
     onSafeModeClick: () -> Unit,
-    onDaemonClick: (String) -> Unit
+    onDaemonClick: (String) -> Unit,
+    onDaemonLongClick: (Daemon) -> Unit = {}
 ) {
     val colors = LocalColdCacheColors.current
     val shapes = LocalColdCacheShapes.current
@@ -266,10 +269,16 @@ fun SystemHeader(
                             )
                             .clip(shapes.primary)
                             .background(colors.bgPanel)
-                            .clickable {
-                                com.example.util.AppHaptics.tick(context)
-                                onDaemonClick(key)
-                            }
+                            .combinedClickable(
+                                onClick = {
+                                    com.example.util.AppHaptics.tick(context)
+                                    onDaemonClick(key)
+                                },
+                                onLongClick = {
+                                    com.example.util.AppHaptics.success(context)
+                                    onDaemonLongClick(daemon)
+                                }
+                            )
                             .testTag("daemon_${key}_button")
                     ) {
                         // Background fill bar with smooth animation

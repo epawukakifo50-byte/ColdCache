@@ -207,7 +207,7 @@ object NotificationHelper {
         )
 
         val builder = NotificationCompat.Builder(context, CHANNEL_DAEMONS_ID)
-            .setSmallIcon(android.R.drawable.ic_menu_compass)
+            .setSmallIcon(com.example.R.drawable.ic_coldcache_logo)
             .setContentTitle("⚡ COLD CACHE | Демоны: $totalReady/3")
             .setContentText(fallbackText)
             .setCustomContentView(smallViews)
@@ -284,7 +284,7 @@ object NotificationHelper {
         )
 
         val notification = NotificationCompat.Builder(context, CHANNEL_TASKS_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(com.example.R.drawable.ic_coldcache_logo)
             .setContentTitle("🕒 ВРЕМЕННОЙ ОРИЕНТИР: $taskTitle")
             .setContentText("Запланировано на $timeStr. Готово к старту в комфортном темпе.")
             .setStyle(NotificationCompat.BigTextStyle().bigText("Ориентир по времени: [ $taskTitle ] на $timeStr.\nБез спешки — начните с 1 легкого микро-действия, когда появится ресурс."))
@@ -321,7 +321,7 @@ object NotificationHelper {
         }
 
         val notification = NotificationCompat.Builder(context, CHANNEL_TASKS_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(com.example.R.drawable.ic_coldcache_logo)
             .setContentTitle("🌅 СИНОПСИС ДНЯ: $count на выбор")
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText("Доброе утро!\n$text.\nВыбирайте задачу по комфортному уровню энергии или оставьте в буфере."))
@@ -352,7 +352,7 @@ object NotificationHelper {
         )
 
         val notification = NotificationCompat.Builder(context, CHANNEL_RAM_IDLE_ID)
-            .setSmallIcon(android.R.drawable.stat_notify_chat)
+            .setSmallIcon(com.example.R.drawable.ic_coldcache_logo)
             .setContentTitle("🫧 ПРОСТРАНСТВО СВОБОДНО")
             .setContentText("Слоты RAM свободны. Время отдыха или 1 легкой мысли.")
             .setStyle(NotificationCompat.BigTextStyle().bigText("Оперативная память чиста.\nНикакого давления: можно отдохнуть или взять одно микро-действие, когда появится вдохновение."))

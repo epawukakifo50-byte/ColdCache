@@ -1,25 +1,20 @@
 package com.example.ui.modals
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -31,10 +26,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.model.Dict
 import com.example.model.Task
 import com.example.model.Terminology
 import com.example.ui.theme.LocalColdCacheColors
@@ -80,7 +73,7 @@ fun ArchiveModal(
 
     var selectedMatrixDate by remember { mutableStateOf<LocalDate?>(today) }
 
-    // Generate 12 weeks grid (84 days) ending on the current week's Sunday
+    // Generate 12 weeks grid (84 days) ending on current week's Sunday
     val daysGrid = remember(today) {
         val days = mutableListOf<List<LocalDate>>()
         val startDay = today.minusWeeks(11).with(DayOfWeek.MONDAY)
@@ -123,10 +116,10 @@ fun ArchiveModal(
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
-            ) { /* Consume clicks to prevent background pass-through */ }
+            ) { /* Consume clicks */ }
             .testTag("archive_modal")
     ) {
-        // --- Top Header with Mode Switch ---
+        // --- Top Header ---
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -140,14 +133,14 @@ fun ArchiveModal(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Icon(
-                    imageVector = if (pagerState.currentPage == 0) Icons.Default.Archive else Icons.Default.GridView,
+                    imageVector = Icons.Default.Archive,
                     contentDescription = null,
-                    tint = if (pagerState.currentPage == 0) colors.textMuted else colors.accent1,
+                    tint = colors.accent1,
                     modifier = Modifier.size(20.dp)
                 )
                 Column {
                     Text(
-                        text = if (pagerState.currentPage == 0) Dict.get(terminology, "archive").uppercase() else "ACTIVITY MATRIX",
+                        text = "CRYSTALLIZE",
                         color = colors.textMain,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
@@ -164,94 +157,16 @@ fun ArchiveModal(
                 }
             }
 
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Cyber Mode Switch (LOG <-> MATRIX)
-                Row(
-                    modifier = Modifier
-                        .clip(shapes.secondary)
-                        .background(colors.bgPanel)
-                        .border(0.5.dp, colors.borderStrong.copy(alpha = 0.4f), shapes.secondary)
-                        .padding(2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val isLog = pagerState.currentPage == 0
-                    Box(
-                        modifier = Modifier
-                            .clip(shapes.secondary)
-                            .background(if (isLog) colors.bgButtonActive else Color.Transparent)
-                            .border(
-                                0.5.dp,
-                                if (isLog) colors.accent1.copy(alpha = 0.6f) else Color.Transparent,
-                                shapes.secondary
-                            )
-                            .clickable {
-                                com.example.util.AppHaptics.toggle(context)
-                                coroutineScope.launch { pagerState.animateScrollToPage(0) }
-                            }
-                            .padding(horizontal = 8.dp, vertical = 5.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "📜 LOG",
-                            color = if (isLog) colors.accent1 else colors.textMuted,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
-
-                    val isMatrix = pagerState.currentPage == 1
-                    Box(
-                        modifier = Modifier
-                            .clip(shapes.secondary)
-                            .background(if (isMatrix) colors.bgButtonActive else Color.Transparent)
-                            .border(
-                                0.5.dp,
-                                if (isMatrix) colors.accent1.copy(alpha = 0.6f) else Color.Transparent,
-                                shapes.secondary
-                            )
-                            .clickable {
-                                com.example.util.AppHaptics.toggle(context)
-                                coroutineScope.launch { pagerState.animateScrollToPage(1) }
-                            }
-                            .padding(horizontal = 8.dp, vertical = 5.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "▦ MATRIX",
-                            color = if (isMatrix) colors.accent1 else colors.textMuted,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
-                        )
+            // Cyber Mode Switch (1v1 TemporalFlux style: LOG <-> MATRIX)
+            CrystallizeModeSwitch(
+                currentPage = pagerState.currentPage,
+                onSelectPage = { page ->
+                    com.example.util.AppHaptics.toggle(context)
+                    coroutineScope.launch {
+                        pagerState.animateScrollToPage(page)
                     }
                 }
-
-                // Close Button
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(shapes.secondary)
-                        .background(colors.bgButton)
-                        .border(0.5.dp, colors.borderStrong.copy(alpha = 0.4f), shapes.secondary)
-                        .clickable {
-                            com.example.util.AppHaptics.click(context)
-                            onClose()
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Close",
-                        tint = colors.textMain,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
+            )
         }
 
         // --- Swipeable HorizontalPager ---
@@ -262,7 +177,7 @@ fun ArchiveModal(
                 .fillMaxWidth()
         ) { pageIndex ->
             if (pageIndex == 0) {
-                // ==================== PAGE 0: RENDER LOG / CRYSTALLIZATION ====================
+                // ==================== PAGE 0: LOG ====================
                 if (renderLog.isEmpty()) {
                     Box(
                         modifier = Modifier
@@ -385,12 +300,12 @@ fun ArchiveModal(
                     }
                 }
             } else {
-                // ==================== PAGE 1: ACTIVITY MATRIX / HEATMAP ====================
+                // ==================== PAGE 1: MATRIX ====================
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 14.dp, vertical = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     // Streak & Stats Hero Card
                     Box(
@@ -455,7 +370,7 @@ fun ArchiveModal(
                         }
                     }
 
-                    // 12-Week Activity Heatmap Matrix
+                    // 12-Week Activity Heatmap Matrix (Full Width + 5-step legend)
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -464,7 +379,7 @@ fun ArchiveModal(
                             .border(0.5.dp, colors.borderStrong.copy(alpha = 0.35f), shapes.primary)
                             .padding(12.dp)
                     ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -479,9 +394,9 @@ fun ArchiveModal(
                                     letterSpacing = 1.sp
                                 )
 
-                                // Intensity Legend
+                                // 5-Step Intensity Legend
                                 Row(
-                                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
@@ -490,12 +405,12 @@ fun ArchiveModal(
                                         fontSize = 7.sp,
                                         fontFamily = FontFamily.Monospace
                                     )
-                                    listOf(0.08f, 0.3f, 0.6f, 1.0f).forEach { alpha ->
+                                    listOf(0.08f, 0.25f, 0.50f, 0.75f, 1.0f).forEach { alpha ->
                                         Box(
                                             modifier = Modifier
                                                 .size(8.dp)
                                                 .clip(shapes.secondary)
-                                                .background(colors.accent1.copy(alpha = alpha))
+                                                .background(if (alpha <= 0.08f) colors.borderStrong.copy(alpha = 0.2f) else colors.accent1.copy(alpha = alpha))
                                         )
                                     }
                                     Text(
@@ -507,15 +422,13 @@ fun ArchiveModal(
                                 }
                             }
 
-                            // Heatmap Grid: Columns = Weeks, Rows = Days of week (Mon..Sun)
+                            // Full-width Grid (12 Columns distributed with SpaceBetween)
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState(Int.MAX_VALUE)),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 daysGrid.forEach { week ->
-                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                         week.forEach { date ->
                                             val dateStr = date.format(formatter)
                                             val dayTasks = tasksByDate[dateStr] ?: emptyList()
@@ -525,8 +438,9 @@ fun ArchiveModal(
 
                                             val bgAlpha = when {
                                                 taskCount >= 4 -> 1.0f
-                                                taskCount >= 2 -> 0.65f
-                                                taskCount == 1 -> 0.35f
+                                                taskCount == 3 -> 0.75f
+                                                taskCount == 2 -> 0.50f
+                                                taskCount == 1 -> 0.25f
                                                 else -> 0.08f
                                             }
 
@@ -534,7 +448,7 @@ fun ArchiveModal(
 
                                             Box(
                                                 modifier = Modifier
-                                                    .size(16.dp)
+                                                    .size(20.dp)
                                                     .clip(shapes.secondary)
                                                     .background(cellColor)
                                                     .border(
@@ -542,7 +456,7 @@ fun ArchiveModal(
                                                         color = when {
                                                             isSelected -> Color.White
                                                             isToday -> colors.accent1
-                                                            taskCount > 0 -> colors.accent1.copy(alpha = 0.5f)
+                                                            taskCount > 0 -> colors.accent1.copy(alpha = 0.6f)
                                                             else -> Color.Transparent
                                                         },
                                                         shape = shapes.secondary
@@ -651,7 +565,7 @@ fun ArchiveModal(
                                                         .clip(shapes.secondary)
                                                         .background(colors.bgButton)
                                                         .border(0.5.dp, colors.borderStrong.copy(alpha = 0.3f), shapes.secondary)
-                                                        .padding(horizontal = 6.dp, vertical = 4.dp)
+                                                    .padding(horizontal = 6.dp, vertical = 4.dp)
                                                 ) {
                                                     Text(
                                                         text = "+${t.weight}MB",
@@ -700,6 +614,97 @@ fun ArchiveModal(
                     fontFamily = FontFamily.Monospace,
                     letterSpacing = 2.sp
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Cyberpunk Mode Switcher matching 1v1 TemporalModeSwitch (Animated sliding thumb)
+ */
+@Composable
+fun CrystallizeModeSwitch(
+    currentPage: Int,
+    onSelectPage: (Int) -> Unit
+) {
+    val colors = LocalColdCacheColors.current
+    val shapes = LocalColdCacheShapes.current
+
+    val targetPos = if (currentPage == 1) 1f else 0f
+    val indicatorBias by animateFloatAsState(
+        targetValue = targetPos,
+        animationSpec = tween(durationMillis = 250),
+        label = "crystallizeSwitchBias"
+    )
+
+    Box(
+        modifier = Modifier
+            .width(170.dp)
+            .height(32.dp)
+            .clip(shapes.secondary)
+            .background(colors.bgButton)
+            .border(0.5.dp, colors.borderStrong.copy(alpha = 0.4f), shapes.secondary)
+            .clickable {
+                onSelectPage(if (currentPage == 0) 1 else 0)
+            }
+            .padding(2.dp)
+    ) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val thumbWidth = maxWidth / 2
+            val xOffset = thumbWidth * indicatorBias
+
+            // Active Sliding Thumb
+            Box(
+                modifier = Modifier
+                    .offset(x = xOffset)
+                    .width(thumbWidth)
+                    .fillMaxHeight()
+                    .cyberGlow(colors.accent1, (colors.glowLevel * 0.6f).toInt(), shape = shapes.secondary, radius = 6.dp)
+                    .clip(shapes.secondary)
+                    .background(colors.accent1.copy(alpha = if (colors.isDark) 0.28f else 0.22f))
+                    .border(0.5.dp, colors.accent1, shapes.secondary)
+            )
+
+            // Clean Monospace Labels (No Emojis)
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // LOG label (Left)
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clickable { onSelectPage(0) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "LOG",
+                        color = if (currentPage == 0) colors.accent1 else colors.textMuted,
+                        fontSize = 9.sp,
+                        fontWeight = if (currentPage == 0) FontWeight.Bold else FontWeight.Medium,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 1.sp
+                    )
+                }
+
+                // MATRIX label (Right)
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clickable { onSelectPage(1) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "MATRIX",
+                        color = if (currentPage == 1) colors.accent1 else colors.textMuted,
+                        fontSize = 9.sp,
+                        fontWeight = if (currentPage == 1) FontWeight.Bold else FontWeight.Medium,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 1.sp
+                    )
+                }
             }
         }
     }

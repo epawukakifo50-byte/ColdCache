@@ -89,6 +89,14 @@ class PreferenceManager(context: Context) {
         val isNewDay = lastDate != null && lastDate != today
         prefs.edit().putString("cc_date", today).apply()
 
+        // Reset step counter baseline on new day so StepSensorManager starts fresh from 0
+        if (isNewDay) {
+            prefs.edit()
+                .remove("cc_step_baseline_sensor")
+                .remove("cc_step_baseline_date")
+                .apply()
+        }
+
         val result = linkedMapOf<String, Daemon>()
 
         if (!savedArrayJson.isNullOrEmpty()) {
@@ -137,6 +145,42 @@ class PreferenceManager(context: Context) {
         return finalDaemons
     }
 
+    fun recordDaemonProgress(key: String, current: Int, max: Int) {
+        try {
+            val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+            val historyKey = "cc_daemon_hist_$key"
+            val existingJson = prefs.getString(historyKey, "{}") ?: "{}"
+            val root = JSONObject(existingJson)
+            val dayObj = JSONObject().apply {
+                put("current", current)
+                put("max", max)
+            }
+            root.put(today, dayObj)
+            prefs.edit().putString(historyKey, root.toString()).apply()
+        } catch (_: Exception) {}
+    }
+
+    fun loadDaemonHistory(key: String): Map<String, Pair<Int, Int>> {
+        val result = mutableMapOf<String, Pair<Int, Int>>()
+        try {
+            val historyKey = "cc_daemon_hist_$key"
+            val existingJson = prefs.getString(historyKey, "{}") ?: "{}"
+            val root = JSONObject(existingJson)
+            val keys = root.keys()
+            while (keys.hasNext()) {
+                val dateStr = keys.next()
+                val dayObj = root.optJSONObject(dateStr)
+                if (dayObj != null) {
+                    result[dateStr] = Pair(dayObj.optInt("current", 0), dayObj.optInt("max", 100))
+                } else {
+                    val num = root.optInt(dateStr, 0)
+                    result[dateStr] = Pair(num, 100)
+                }
+            }
+        } catch (_: Exception) {}
+        return result
+    }
+
     fun saveDaemons(daemons: Map<String, Daemon>) {
         try {
             val array = JSONArray()
@@ -154,6 +198,7 @@ class PreferenceManager(context: Context) {
                 }
                 array.put(obj)
                 root.put(k, obj)
+                recordDaemonProgress(d.key, d.current, d.max)
             }
             prefs.edit()
                 .putString("cc_daemons_array", array.toString())

@@ -16,6 +16,8 @@ import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,13 +52,15 @@ fun MainDashboardScreen(
     schedulingTask: Task?,
     ramOverflowTask: Task?,
     editingTaskId: String?,
-    isBufferReversed: Boolean
+    isBufferReversed: Boolean,
+    onSyncHealth: (() -> Unit)? = null
 ) {
     val colors = LocalColdCacheColors.current
     val shapes = LocalColdCacheShapes.current
     val scrollState = rememberScrollState()
 
     val scheduledCount = allTasks.count { !it.scheduledDate.isNullOrBlank() }
+    val selectedHeatmapDaemon by viewModel.selectedHeatmapDaemon.collectAsState()
 
     val modalEnter = fadeIn(tween(220)) +
             slideInVertically(
@@ -89,7 +93,8 @@ fun MainDashboardScreen(
                 onMatrixClick = { viewModel.openMatrix(true) },
                 onSettingsClick = { viewModel.openSettings(true) },
                 onSafeModeClick = { viewModel.setSystemState(AppSystemState.SAFE_MODE) },
-                onDaemonClick = { viewModel.interactDaemon(it) }
+                onDaemonClick = { viewModel.interactDaemon(it) },
+                onDaemonLongClick = { viewModel.openDaemonHeatmap(it) }
             )
 
             // --- Quick Nav Bar (Buffer & Temporal Flux Launchers) ---
@@ -302,6 +307,7 @@ fun MainDashboardScreen(
                 onUpdateDaemonFull = { daemon ->
                     viewModel.updateDaemonFull(daemon)
                 },
+                onSyncHealth = onSyncHealth ?: { viewModel.syncWithHealthConnect() },
                 onExportDump = { viewModel.exportMemoryDumpJson() },
                 onImportDump = { viewModel.importMemoryDumpJson(it) },
                 onExportMarkdown = { viewModel.exportMarkdownJournal() },
@@ -318,6 +324,20 @@ fun MainDashboardScreen(
                 terminology = config.terminology,
                 onClose = { viewModel.openManual(false) }
             )
+        }
+
+        AnimatedVisibility(
+            visible = selectedHeatmapDaemon != null,
+            enter = modalEnter,
+            exit = modalExit
+        ) {
+            selectedHeatmapDaemon?.let { daemon ->
+                com.example.ui.modals.DaemonHeatmapModal(
+                    daemon = daemon,
+                    onSyncHealth = onSyncHealth ?: { viewModel.syncWithHealthConnect() },
+                    onClose = { viewModel.openDaemonHeatmap(null) }
+                )
+            }
         }
 
         schedulingTask?.let { task ->

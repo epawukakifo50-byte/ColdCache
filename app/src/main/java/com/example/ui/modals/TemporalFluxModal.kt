@@ -118,43 +118,17 @@ fun TemporalFluxModal(
                 )
             }
 
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Cyber Mode Switch (STREAM <-> MATRIX)
-                TemporalModeSwitch(
-                    currentPage = pagerState.currentPage,
-                    onSelectPage = { page ->
-                        com.example.util.AppHaptics.toggle(context)
-                        coroutineScope.launch {
-                            pagerState.animateScrollToPage(page)
-                        }
-                    },
-                    terminology = terminology
-                )
-
-                // Close Button
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(shapes.secondary)
-                        .background(colors.bgButton)
-                        .border(0.5.dp, colors.borderStrong.copy(alpha = 0.4f), shapes.secondary)
-                        .clickable {
-                            com.example.util.AppHaptics.click(context)
-                            onClose()
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Close",
-                        tint = colors.textMain,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
+            // Cyber Mode Switch (STREAM <-> MATRIX)
+            TemporalModeSwitch(
+                currentPage = pagerState.currentPage,
+                onSelectPage = { page ->
+                    com.example.util.AppHaptics.toggle(context)
+                    coroutineScope.launch {
+                        pagerState.animateScrollToPage(page)
+                    }
+                },
+                terminology = terminology
+            )
         }
 
         // --- Swipeable HorizontalPager (Page 0: STREAM, Page 1: MATRIX) ---

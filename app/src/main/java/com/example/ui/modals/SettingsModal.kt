@@ -100,6 +100,7 @@ fun SettingsModal(
     onDeleteDaemon: (String) -> Unit = {},
     onMoveDaemon: (String, Int) -> Unit = { _, _ -> },
     onUpdateDaemonFull: (Daemon) -> Unit = {},
+    onSyncHealth: (() -> Unit)? = null,
     onExportDump: () -> String,
     onImportDump: (String) -> Boolean,
     onExportMarkdown: () -> Unit = {},
@@ -108,6 +109,7 @@ fun SettingsModal(
     val colors = LocalColdCacheColors.current
     val shapes = LocalColdCacheShapes.current
     val context = LocalContext.current
+    var localDaemonsList by remember(daemons) { mutableStateOf(daemons.values.toList()) }
     val scrollState = rememberScrollState()
 
     var showImportDialog by remember { mutableStateOf(false) }
@@ -1400,17 +1402,18 @@ fun SettingsModal(
                 }
 
                 // Render Dynamic Daemon Cards
-                daemons.values.toList().forEachIndexed { index, daemon ->
+                localDaemonsList.forEachIndexed { index, daemon ->
                     val key = daemon.key
-                    val dColor = com.example.model.getDaemonColor(key, true, daemon.colorHex)
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(shapes.primary)
-                            .background(colors.bgPanel)
-                            .border(0.5.dp, colors.borderStrong.copy(alpha = 0.35f), shapes.primary)
-                            .padding(12.dp)
-                    ) {
+                    key(key) {
+                        val dColor = com.example.model.getDaemonColor(key, true, daemon.colorHex)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(shapes.primary)
+                                .background(colors.bgPanel)
+                                .border(0.5.dp, colors.borderStrong.copy(alpha = 0.35f), shapes.primary)
+                                .padding(12.dp)
+                        ) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             // Header: Icon + Label + Reorder (▲/▼) + Type Badge + Delete
                             Row(
@@ -1445,12 +1448,14 @@ fun SettingsModal(
                                     )
                                 }
 
+                                Spacer(modifier = Modifier.width(10.dp))
+
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     // Reorder buttons: UP / DOWN
-                                    if (daemons.size > 1) {
+                                    if (localDaemonsList.size > 1) {
                                         Box(
                                             modifier = Modifier
                                                 .size(24.dp)
@@ -1458,7 +1463,13 @@ fun SettingsModal(
                                                 .background(colors.bgButton)
                                                 .border(0.5.dp, if (index > 0) colors.borderStrong.copy(alpha = 0.5f) else colors.borderStrong.copy(alpha = 0.15f), shapes.secondary)
                                                 .clickable(enabled = index > 0) {
-                                                    onMoveDaemon(key, -1)
+                                                    if (index > 0) {
+                                                        val list = localDaemonsList.toMutableList()
+                                                        val item = list.removeAt(index)
+                                                        list.add(index - 1, item)
+                                                        localDaemonsList = list
+                                                        onMoveDaemon(key, -1)
+                                                    }
                                                 },
                                             contentAlignment = Alignment.Center
                                         ) {
@@ -1475,15 +1486,21 @@ fun SettingsModal(
                                                 .size(24.dp)
                                                 .clip(shapes.secondary)
                                                 .background(colors.bgButton)
-                                                .border(0.5.dp, if (index < daemons.size - 1) colors.borderStrong.copy(alpha = 0.5f) else colors.borderStrong.copy(alpha = 0.15f), shapes.secondary)
-                                                .clickable(enabled = index < daemons.size - 1) {
-                                                    onMoveDaemon(key, 1)
+                                                .border(0.5.dp, if (index < localDaemonsList.size - 1) colors.borderStrong.copy(alpha = 0.5f) else colors.borderStrong.copy(alpha = 0.15f), shapes.secondary)
+                                                .clickable(enabled = index < localDaemonsList.size - 1) {
+                                                    if (index < localDaemonsList.size - 1) {
+                                                        val list = localDaemonsList.toMutableList()
+                                                        val item = list.removeAt(index)
+                                                        list.add(index + 1, item)
+                                                        localDaemonsList = list
+                                                        onMoveDaemon(key, 1)
+                                                    }
                                                 },
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Text(
                                                 text = "▼",
-                                                color = if (index < daemons.size - 1) colors.textMain else colors.textMuted.copy(alpha = 0.3f),
+                                                color = if (index < localDaemonsList.size - 1) colors.textMain else colors.textMuted.copy(alpha = 0.3f),
                                                 fontSize = 9.sp,
                                                 fontWeight = FontWeight.Bold
                                             )
@@ -1507,16 +1524,16 @@ fun SettingsModal(
                                             .padding(horizontal = 6.dp, vertical = 4.dp)
                                     ) {
                                         Text(
-                                            text = if (daemon.type == com.example.model.DaemonType.SENSOR_STEPS) "🚶 SENSOR" else "👆 MANUAL",
+                                            text = if (daemon.type == com.example.model.DaemonType.SENSOR_STEPS) "SENS" else "MAN",
                                             color = if (daemon.type == com.example.model.DaemonType.SENSOR_STEPS) colors.accent1 else colors.textMuted,
-                                            fontSize = 8.sp,
+                                            fontSize = 9.sp,
                                             fontWeight = FontWeight.Bold,
                                             fontFamily = FontFamily.Monospace
                                         )
                                     }
 
                                     // Delete Button (if more than 1 daemon exists)
-                                    if (daemons.size > 1) {
+                                    if (localDaemonsList.size > 1) {
                                         Box(
                                             modifier = Modifier
                                                 .size(24.dp)
@@ -1524,6 +1541,9 @@ fun SettingsModal(
                                                 .background(colors.bgButton)
                                                 .border(0.5.dp, Color.Red.copy(alpha = 0.4f), shapes.secondary)
                                                 .clickable {
+                                                    val list = localDaemonsList.toMutableList()
+                                                    list.removeAt(index)
+                                                    localDaemonsList = list
                                                     onDeleteDaemon(key)
                                                 },
                                             contentAlignment = Alignment.Center
@@ -1643,6 +1663,7 @@ fun SettingsModal(
                                 }
                             }
                         }
+                    }
                     }
                 }
             }
