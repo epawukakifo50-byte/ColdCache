@@ -296,6 +296,9 @@ fun MainDashboardScreen(
                 onDeleteDaemon = { key ->
                     viewModel.deleteCustomDaemon(key)
                 },
+                onMoveDaemon = { key, dir ->
+                    viewModel.moveDaemon(key, dir)
+                },
                 onUpdateDaemonFull = { daemon ->
                     viewModel.updateDaemonFull(daemon)
                 },

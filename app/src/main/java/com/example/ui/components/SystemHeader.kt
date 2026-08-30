@@ -135,7 +135,7 @@ fun SystemHeader(
                     )
                 }
 
-                // Archive Button with indicator badge
+                // Unified Crystallization / Matrix Button with indicator badge
                 Box(
                     modifier = Modifier
                         .size(34.dp)
@@ -151,7 +151,7 @@ fun SystemHeader(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Archive,
-                        contentDescription = "Archive",
+                        contentDescription = "Crystallization & Matrix",
                         tint = colors.textMuted,
                         modifier = Modifier.size(15.dp)
                     )
@@ -165,28 +165,6 @@ fun SystemHeader(
                                 .background(colors.accent1)
                         )
                     }
-                }
-
-                // Data Matrix Heatmap Button
-                Box(
-                    modifier = Modifier
-                        .size(34.dp)
-                        .clip(shapes.secondary)
-                        .background(colors.bgButton)
-                        .border(0.5.dp, colors.borderStrong.copy(alpha = 0.4f), shapes.secondary)
-                        .clickable {
-                            com.example.util.AppHaptics.click(context)
-                            onMatrixClick()
-                        }
-                        .testTag("header_matrix_button"),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.GridView,
-                        contentDescription = "Data Matrix",
-                        tint = colors.textMuted,
-                        modifier = Modifier.size(15.dp)
-                    )
                 }
 
                 // Settings Button

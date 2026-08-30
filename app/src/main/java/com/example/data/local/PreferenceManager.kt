@@ -3,6 +3,7 @@ package com.example.data.local
 import android.content.Context
 import android.content.SharedPreferences
 import com.example.model.*
+import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -80,48 +81,65 @@ class PreferenceManager(context: Context) {
     }
 
     fun loadDaemons(): Map<String, Daemon> {
-        val savedJson = prefs.getString("cc_daemons", null)
+        val savedArrayJson = prefs.getString("cc_daemons_array", null)
+        val savedObjectJson = prefs.getString("cc_daemons", null)
         val lastDate = prefs.getString("cc_date", null)
         val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
 
         val isNewDay = lastDate != null && lastDate != today
         prefs.edit().putString("cc_date", today).apply()
 
-        if (savedJson.isNullOrEmpty()) {
-            return DEFAULT_DAEMONS
+        val result = linkedMapOf<String, Daemon>()
+
+        if (!savedArrayJson.isNullOrEmpty()) {
+            try {
+                val array = JSONArray(savedArrayJson)
+                for (i in 0 until array.length()) {
+                    val obj = array.getJSONObject(i)
+                    val key = obj.optString("key", "d_${i + 1}")
+                    val label = obj.optString("label", "DAEMON")
+                    val max = obj.optInt("max", 100)
+                    val step = obj.optInt("step", 1)
+                    val iconName = obj.optString("iconName", "SquareActivity")
+                    val typeName = obj.optString("type", DaemonType.MANUAL.name)
+                    val type = try { DaemonType.valueOf(typeName) } catch (_: Exception) { DaemonType.MANUAL }
+                    val colorHex = if (obj.has("colorHex") && !obj.isNull("colorHex")) obj.getString("colorHex") else null
+                    val current = if (isNewDay) 0 else obj.optInt("current", 0)
+                    result[key] = Daemon(key, label, current, max, step, iconName, type, colorHex)
+                }
+            } catch (_: Exception) {}
+        } else if (!savedObjectJson.isNullOrEmpty()) {
+            try {
+                val root = JSONObject(savedObjectJson)
+                val keys = root.keys()
+                while (keys.hasNext()) {
+                    val key = keys.next()
+                    val obj = root.getJSONObject(key)
+                    val label = obj.optString("label", "DAEMON")
+                    val max = obj.optInt("max", 100)
+                    val step = obj.optInt("step", 1)
+                    val iconName = obj.optString("iconName", "SquareActivity")
+                    val typeName = obj.optString("type", DaemonType.MANUAL.name)
+                    val type = try { DaemonType.valueOf(typeName) } catch (_: Exception) { DaemonType.MANUAL }
+                    val colorHex = if (obj.has("colorHex") && !obj.isNull("colorHex")) obj.getString("colorHex") else null
+                    val current = if (isNewDay) 0 else obj.optInt("current", 0)
+                    result[key] = Daemon(key, label, current, max, step, iconName, type, colorHex)
+                }
+            } catch (_: Exception) {}
         }
 
-        val daemons = try {
-            val root = JSONObject(savedJson)
-            val result = linkedMapOf<String, Daemon>()
-            val keys = root.keys()
-            while (keys.hasNext()) {
-                val key = keys.next()
-                val obj = root.getJSONObject(key)
-                val label = obj.optString("label", "DAEMON")
-                val max = obj.optInt("max", 100)
-                val step = obj.optInt("step", 1)
-                val iconName = obj.optString("iconName", "SquareActivity")
-                val typeName = obj.optString("type", DaemonType.MANUAL.name)
-                val type = try { DaemonType.valueOf(typeName) } catch (_: Exception) { DaemonType.MANUAL }
-                val colorHex = if (obj.has("colorHex") && !obj.isNull("colorHex")) obj.getString("colorHex") else null
-                val current = if (isNewDay) 0 else obj.optInt("current", 0)
-                result[key] = Daemon(key, label, current, max, step, iconName, type, colorHex)
-            }
-            if (result.isEmpty()) DEFAULT_DAEMONS else result
-        } catch (_: Exception) {
-            DEFAULT_DAEMONS
+        val finalDaemons = if (result.isEmpty()) DEFAULT_DAEMONS else result
+
+        if (isNewDay || savedArrayJson.isNullOrEmpty()) {
+            saveDaemons(finalDaemons)
         }
 
-        if (isNewDay) {
-            saveDaemons(daemons)
-        }
-
-        return daemons
+        return finalDaemons
     }
 
     fun saveDaemons(daemons: Map<String, Daemon>) {
         try {
+            val array = JSONArray()
             val root = JSONObject()
             for ((k, d) in daemons) {
                 val obj = JSONObject().apply {
@@ -134,9 +152,13 @@ class PreferenceManager(context: Context) {
                     put("type", d.type.name)
                     put("colorHex", d.colorHex)
                 }
+                array.put(obj)
                 root.put(k, obj)
             }
-            prefs.edit().putString("cc_daemons", root.toString()).apply()
+            prefs.edit()
+                .putString("cc_daemons_array", array.toString())
+                .putString("cc_daemons", root.toString())
+                .apply()
         } catch (_: Exception) {}
     }
 

@@ -254,6 +254,22 @@ class ColdCacheViewModel(
         syncExternalViews()
     }
 
+    fun moveDaemon(key: String, direction: Int) {
+        val list = _daemons.value.values.toMutableList()
+        val index = list.indexOfFirst { it.key == key }
+        if (index < 0) return
+        val targetIndex = index + direction
+        if (targetIndex < 0 || targetIndex >= list.size) return
+        val item = list.removeAt(index)
+        list.add(targetIndex, item)
+        val orderedMap = linkedMapOf<String, Daemon>()
+        list.forEach { orderedMap[it.key] = it }
+        _daemons.value = orderedMap
+        prefManager.saveDaemons(orderedMap)
+        syncExternalViews()
+        com.example.util.AppHaptics.tick(appContext, _systemConfig.value.hapticFeedbackEnabled)
+    }
+
     fun updateDaemonConfig(key: String, label: String? = null, max: Int? = null, step: Int? = null, iconName: String? = null, type: DaemonType? = null, colorHex: String? = null) {
         val currentDaemons = _daemons.value.toMutableMap()
         val d = currentDaemons[key] ?: return

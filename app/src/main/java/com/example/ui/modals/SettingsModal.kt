@@ -98,6 +98,7 @@ fun SettingsModal(
     onUpdateDaemon: (String, String?, Int?, Int?, String?) -> Unit,
     onAddDaemon: (String, Int, Int, String, com.example.model.DaemonType, String?) -> Unit = { _, _, _, _, _, _ -> },
     onDeleteDaemon: (String) -> Unit = {},
+    onMoveDaemon: (String, Int) -> Unit = { _, _ -> },
     onUpdateDaemonFull: (Daemon) -> Unit = {},
     onExportDump: () -> String,
     onImportDump: (String) -> Boolean,
@@ -1399,7 +1400,7 @@ fun SettingsModal(
                 }
 
                 // Render Dynamic Daemon Cards
-                daemons.values.forEach { daemon ->
+                daemons.values.toList().forEachIndexed { index, daemon ->
                     val key = daemon.key
                     val dColor = com.example.model.getDaemonColor(key, true, daemon.colorHex)
                     Box(
@@ -1411,7 +1412,7 @@ fun SettingsModal(
                             .padding(12.dp)
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            // Header: Icon + Label + Type Badge + Delete
+                            // Header: Icon + Label + Reorder (▲/▼) + Type Badge + Delete
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1448,6 +1449,47 @@ fun SettingsModal(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
+                                    // Reorder buttons: UP / DOWN
+                                    if (daemons.size > 1) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(24.dp)
+                                                .clip(shapes.secondary)
+                                                .background(colors.bgButton)
+                                                .border(0.5.dp, if (index > 0) colors.borderStrong.copy(alpha = 0.5f) else colors.borderStrong.copy(alpha = 0.15f), shapes.secondary)
+                                                .clickable(enabled = index > 0) {
+                                                    onMoveDaemon(key, -1)
+                                                },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = "▲",
+                                                color = if (index > 0) colors.textMain else colors.textMuted.copy(alpha = 0.3f),
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+
+                                        Box(
+                                            modifier = Modifier
+                                                .size(24.dp)
+                                                .clip(shapes.secondary)
+                                                .background(colors.bgButton)
+                                                .border(0.5.dp, if (index < daemons.size - 1) colors.borderStrong.copy(alpha = 0.5f) else colors.borderStrong.copy(alpha = 0.15f), shapes.secondary)
+                                                .clickable(enabled = index < daemons.size - 1) {
+                                                    onMoveDaemon(key, 1)
+                                                },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = "▼",
+                                                color = if (index < daemons.size - 1) colors.textMain else colors.textMuted.copy(alpha = 0.3f),
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+
                                     // Tracking Type Toggle Badge
                                     Box(
                                         modifier = Modifier
