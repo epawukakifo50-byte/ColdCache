@@ -6,7 +6,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.GridView
@@ -236,14 +238,37 @@ fun SystemHeader(
         Spacer(modifier = Modifier.height(12.dp))
 
         // --- Daemons Cards Grid ---
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            listOf("d1", "d2", "d3").forEach { key ->
-                val daemon = daemons[key]
-                if (daemon != null) {
-                    val dColor = getDaemonColor(key, colors.isDark)
+        val daemonList = daemons.values.toList()
+        if (daemonList.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .clip(shapes.primary)
+                    .background(colors.bgPanel)
+                    .border(0.5.dp, colors.borderStrong.copy(alpha = 0.35f), shapes.primary)
+                    .clickable { onSettingsClick() },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "[ + НАСТРОИТЬ ДЕМОНОВ В SETTINGS ]",
+                    color = colors.accent1,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+        } else {
+            val isScrollable = daemonList.size > 3
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(if (isScrollable) Modifier.horizontalScroll(rememberScrollState()) else Modifier),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                daemonList.forEach { daemon ->
+                    val key = daemon.key
+                    val dColor = getDaemonColor(key, colors.isDark, daemon.colorHex)
                     val isDone = daemon.current >= daemon.max
                     val isActive = daemon.current > 0
                     val targetProgress = if (daemon.max > 0) (daemon.current.toFloat() / daemon.max).coerceIn(0f, 1f) else 0f
@@ -255,7 +280,7 @@ fun SystemHeader(
 
                     Box(
                         modifier = Modifier
-                            .weight(1f)
+                            .then(if (isScrollable) Modifier.widthIn(min = 108.dp, max = 135.dp) else Modifier.weight(1f))
                             .height(54.dp)
                             .then(
                                 if (isActive) Modifier.cyberGlow(dColor, (colors.glowLevel * 0.7f).toInt(), shape = shapes.primary, radius = 8.dp)

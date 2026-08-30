@@ -79,6 +79,7 @@ fun BufferModal(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .imePadding()
             .background(colors.bgBase)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },

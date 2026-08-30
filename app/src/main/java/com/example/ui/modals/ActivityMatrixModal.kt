@@ -1,4 +1,4 @@
-﻿package com.example.ui.modals
+package com.example.ui.modals
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
@@ -46,9 +46,19 @@ fun ActivityMatrixModal(
     val today = remember { LocalDate.now() }
     val formatter = remember { DateTimeFormatter.ofPattern("yyyy-MM-dd") }
 
-    // Map dateStr -> tasks completed
+    // Map dateStr (yyyy-MM-dd) -> tasks completed
     val tasksByDate = remember(renderLog) {
-        renderLog.groupBy { it.completedAt?.take(10) ?: "" }.filterKeys { it.isNotBlank() }
+        renderLog.groupBy { task ->
+            val c = task.completedAt?.trim() ?: ""
+            if (c.length >= 10 && c.contains("-")) {
+                c.substring(0, 10)
+            } else {
+                java.time.Instant.ofEpochMilli(task.createdAt)
+                    .atZone(java.time.ZoneId.systemDefault())
+                    .toLocalDate()
+                    .toString()
+            }
+        }
     }
 
     var selectedDate by remember { mutableStateOf<LocalDate?>(today) }

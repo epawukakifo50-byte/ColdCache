@@ -136,6 +136,8 @@ class QuickBufferActivity : ComponentActivity() {
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null
                         ) { finish() }
+                        .imePadding()
+                        .navigationBarsPadding()
                         .padding(20.dp),
                     contentAlignment = Alignment.Center
                 ) {

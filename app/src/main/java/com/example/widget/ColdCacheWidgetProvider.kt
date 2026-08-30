@@ -74,15 +74,13 @@ class ColdCacheOverviewWidgetProvider : AppWidgetProvider() {
             val cryoCount = tasks.count { it.state == TaskState.CRYO }
             val bufCount = tasks.count { it.state == TaskState.BUFFER }
 
-            val d1 = daemons["d1"] ?: DEFAULT_DAEMONS["d1"]
-            val d2 = daemons["d2"] ?: DEFAULT_DAEMONS["d2"]
-            val d3 = daemons["d3"] ?: DEFAULT_DAEMONS["d3"]
-            val daemonsDone = listOfNotNull(d1, d2, d3).count { it.current >= it.max }
+            val totalDaemons = if (daemons.isNotEmpty()) daemons.size else 3
+            val daemonsDone = daemons.values.count { it.current >= it.max }
 
             views.setTextViewText(R.id.widget_overview_ram_val, "$ramCount/2")
             views.setTextViewText(R.id.widget_overview_cryo_val, "$cryoCount")
             views.setTextViewText(R.id.widget_overview_buf_val, "$bufCount")
-            views.setTextViewText(R.id.widget_overview_daemons_val, "$daemonsDone/3")
+            views.setTextViewText(R.id.widget_overview_daemons_val, "$daemonsDone/$totalDaemons")
 
             val statusText = if (ramCount >= 2) {
                 "● ПАМЯТЬ ЗАПОЛНЕНА (2/2)"
@@ -393,17 +391,18 @@ class ColdCacheDaemonsWidgetProvider : AppWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.widget_daemons_root, pendingIntent)
 
-            val d1 = daemons["d1"] ?: DEFAULT_DAEMONS["d1"] ?: Daemon("d1", "Шаги", 0, 10000, 1000, "SquareActivity")
-            val d2 = daemons["d2"] ?: DEFAULT_DAEMONS["d2"] ?: Daemon("d2", "Вода", 0, 2000, 250, "Droplet")
-            val d3 = daemons["d3"] ?: DEFAULT_DAEMONS["d3"] ?: Daemon("d3", "Сон", 0, 1, 1, "Battery")
+            val daemonList = daemons.values.toList()
+            val d1 = daemonList.getOrNull(0) ?: Daemon("d1", "KINEMATICS", 0, 10000, 1000, "SquareActivity")
+            val d2 = daemonList.getOrNull(1) ?: Daemon("d2", "COOLANT", 0, 2000, 250, "Droplet")
+            val d3 = daemonList.getOrNull(2) ?: Daemon("d3", "HARDWARE", 0, 1, 1, "Battery")
 
-            val totalReady = listOf(d1, d2, d3).count { it.current >= it.max }
-            views.setTextViewText(R.id.widget_daemons_sync, "SYNC: $totalReady/3")
+            val totalReady = daemonList.count { it.current >= it.max }
+            views.setTextViewText(R.id.widget_daemons_sync, "SYNC: $totalReady/${daemonList.size}")
 
             // D1 Intents & Views
             val d1Intent = Intent(context, DaemonActionReceiver::class.java).apply {
                 action = DaemonActionReceiver.ACTION_INTERACT_DAEMON
-                putExtra(DaemonActionReceiver.EXTRA_DAEMON_KEY, "d1")
+                putExtra(DaemonActionReceiver.EXTRA_DAEMON_KEY, d1.key)
             }
             val d1Pending = PendingIntent.getBroadcast(
                 context, 201, d1Intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -418,7 +417,7 @@ class ColdCacheDaemonsWidgetProvider : AppWidgetProvider() {
             // D2 Intents & Views
             val d2Intent = Intent(context, DaemonActionReceiver::class.java).apply {
                 action = DaemonActionReceiver.ACTION_INTERACT_DAEMON
-                putExtra(DaemonActionReceiver.EXTRA_DAEMON_KEY, "d2")
+                putExtra(DaemonActionReceiver.EXTRA_DAEMON_KEY, d2.key)
             }
             val d2Pending = PendingIntent.getBroadcast(
                 context, 202, d2Intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -433,7 +432,7 @@ class ColdCacheDaemonsWidgetProvider : AppWidgetProvider() {
             // D3 Intents & Views
             val d3Intent = Intent(context, DaemonActionReceiver::class.java).apply {
                 action = DaemonActionReceiver.ACTION_INTERACT_DAEMON
-                putExtra(DaemonActionReceiver.EXTRA_DAEMON_KEY, "d3")
+                putExtra(DaemonActionReceiver.EXTRA_DAEMON_KEY, d3.key)
             }
             val d3Pending = PendingIntent.getBroadcast(
                 context, 203, d3Intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE

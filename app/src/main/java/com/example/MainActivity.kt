@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.example.data.local.AppDatabase
@@ -61,26 +62,35 @@ class MainActivity : ComponentActivity() {
             val systemState by viewModel.systemState.collectAsState()
             val daemons by viewModel.daemons.collectAsState()
 
-            // Request Notification Permission on Android 13+
-            val notificationPermissionLauncher = rememberLauncherForActivityResult(
-                contract = ActivityResultContracts.RequestPermission()
-            ) { isGranted ->
-                if (isGranted && systemConfig.daemonShadeTracker) {
+            // Request Runtime Permissions
+            val permissionsToRequest = remember {
+                mutableListOf<String>().apply {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        add(Manifest.permission.POST_NOTIFICATIONS)
+                    }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        add(Manifest.permission.ACTIVITY_RECOGNITION)
+                    }
+                    add(Manifest.permission.RECORD_AUDIO)
+                }
+            }
+
+            val multiplePermissionsLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.RequestMultiplePermissions()
+            ) { results ->
+                if (results[Manifest.permission.POST_NOTIFICATIONS] == true && systemConfig.daemonShadeTracker) {
                     com.example.service.NotificationHelper.showOrUpdateDaemonNotification(applicationContext)
                 }
             }
 
             LaunchedEffect(Unit) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    val hasPermission = ContextCompat.checkSelfPermission(
-                        this@MainActivity,
-                        Manifest.permission.POST_NOTIFICATIONS
-                    ) == PackageManager.PERMISSION_GRANTED
-                    if (!hasPermission) {
-                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    } else if (systemConfig.daemonShadeTracker) {
-                        com.example.service.NotificationHelper.showOrUpdateDaemonNotification(applicationContext)
-                    }
+                val needed = permissionsToRequest.filter { perm ->
+                    ContextCompat.checkSelfPermission(this@MainActivity, perm) != PackageManager.PERMISSION_GRANTED
+                }
+                if (needed.isNotEmpty()) {
+                    multiplePermissionsLauncher.launch(needed.toTypedArray())
+                } else if (systemConfig.daemonShadeTracker) {
+                    com.example.service.NotificationHelper.showOrUpdateDaemonNotification(applicationContext)
                 }
             }
 

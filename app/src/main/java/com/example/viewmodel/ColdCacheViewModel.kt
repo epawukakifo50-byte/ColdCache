@@ -162,6 +162,7 @@ class ColdCacheViewModel(
         ColdCacheWidgetProvider.updateAllWidgets(appContext)
         if (_systemConfig.value.daemonShadeTracker) {
             DaemonTrackerService.updateNotification(appContext, _daemons.value)
+            com.example.service.NotificationHelper.showOrUpdateDaemonNotification(appContext)
         }
     }
 
@@ -217,6 +218,8 @@ class ColdCacheViewModel(
     fun addCustomDaemon(label: String, max: Int, step: Int, iconName: String, type: DaemonType = DaemonType.MANUAL, colorHex: String? = null) {
         val currentDaemons = _daemons.value.toMutableMap()
         val newKey = "d_${System.currentTimeMillis()}"
+        val palette = listOf("#acf002", "#06b6d4", "#a855f7", "#ec4899", "#f59e0b", "#3b82f6", "#10b981")
+        val assignedColor = colorHex ?: if (type == DaemonType.SENSOR_STEPS) "#acf002" else palette[currentDaemons.size % palette.size]
         val newDaemon = Daemon(
             key = newKey,
             label = label.trim().ifBlank { "DAEMON" },
@@ -225,7 +228,7 @@ class ColdCacheViewModel(
             step = step.coerceAtLeast(1),
             iconName = iconName,
             type = type,
-            colorHex = colorHex
+            colorHex = assignedColor
         )
         currentDaemons[newKey] = newDaemon
         _daemons.value = currentDaemons
@@ -376,9 +379,9 @@ class ColdCacheViewModel(
     fun finishCompilation() {
         val task = _activeColliderTask.value
         if (task != null) {
-            val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+            val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
             val completed = task.copy(
-                completedAt = timeStr,
+                completedAt = timestamp,
                 progress = 100
             )
             viewModelScope.launch {
