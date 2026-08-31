@@ -244,4 +244,24 @@ class PreferenceManager(context: Context) {
     fun saveActiveTaskId(id: String?) {
         prefs.edit().putString("cc_active_task_id", id).apply()
     }
+
+    fun loadLastBackupTimestamp(): Long {
+        return prefs.getLong("cc_last_backup_timestamp", 0L)
+    }
+
+    fun saveLastBackupTimestamp(timestamp: Long) {
+        prefs.edit().putLong("cc_last_backup_timestamp", timestamp).apply()
+    }
+
+    fun loadTaskFocusSeconds(taskId: String): Int {
+        return prefs.getInt("cc_focus_sec_$taskId", 0)
+    }
+
+    fun saveTaskFocusSeconds(taskId: String, seconds: Int) {
+        prefs.edit().putInt("cc_focus_sec_$taskId", seconds).apply()
+    }
+
+    fun clearTaskFocusSeconds(taskId: String) {
+        prefs.edit().remove("cc_focus_sec_$taskId").apply()
+    }
 }

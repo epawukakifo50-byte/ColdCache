@@ -1,8 +1,18 @@
 package com.example.ui.modals
 
+import android.app.Activity
+import android.content.Intent
+import android.speech.RecognizerIntent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,11 +21,11 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import android.app.Activity
-import android.content.Intent
-import android.speech.RecognizerIntent
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.IntOffset
+import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
+import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Mic
@@ -52,10 +62,7 @@ fun BufferModal(
     onCreateTask: (String) -> Unit,
     onMoveToCryo: (String) -> Unit,
     onMoveToRam: (String) -> Unit,
-    onScheduleTask: (Task) -> Unit,
-    editingTaskId: String?,
     onStartEdit: (Task) -> Unit,
-    onSaveEdit: (String, String) -> Unit,
     onClose: () -> Unit
 ) {
     val colors = LocalColdCacheColors.current
@@ -248,10 +255,7 @@ fun BufferModal(
                 BufferTaskCard(
                     task = task,
                     terminology = terminology,
-                    isEditing = editingTaskId == task.id,
                     onStartEdit = { onStartEdit(task) },
-                    onSaveEdit = { newTitle -> onSaveEdit(task.id, newTitle) },
-                    onSchedule = { onScheduleTask(task) },
                     onMoveToCryo = { onMoveToCryo(task.id) },
                     onMoveToRam = { onMoveToRam(task.id) }
                 )
@@ -295,52 +299,169 @@ fun BufferModal(
 private fun BufferTaskCard(
     task: Task,
     terminology: Terminology,
-    isEditing: Boolean,
     onStartEdit: () -> Unit,
-    onSaveEdit: (String) -> Unit,
-    onSchedule: () -> Unit,
     onMoveToCryo: () -> Unit,
     onMoveToRam: () -> Unit
 ) {
     val colors = LocalColdCacheColors.current
     val shapes = LocalColdCacheShapes.current
     val context = androidx.compose.ui.platform.LocalContext.current
-    var editValue by remember(task.title, isEditing) { mutableStateOf(task.title) }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val coroutineScope = rememberCoroutineScope()
+
+    val thresholdPx = with(density) { 95.dp.toPx() }
+    val offsetX = remember { Animatable(0f) }
+    var hasHapticFired by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .clip(shapes.primary)
-            .background(colors.bgPanel)
-            .border(0.5.dp, colors.borderStrong.copy(alpha = 0.3f), shapes.primary)
-            .padding(12.dp)
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+        // --- Background Action Reveal Layer ---
+        val curOffset = offsetX.value
+        val isSwipingRight = curOffset > 8f
+        val isSwipingLeft = curOffset < -8f
+
+        if (isSwipingRight) {
+            val progress = (curOffset / thresholdPx).coerceIn(0f, 1f)
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .clip(shapes.primary)
+                    .background(colors.accent1.copy(alpha = 0.15f + 0.25f * progress))
+                    .border(1.dp, colors.accent1.copy(alpha = 0.4f + 0.6f * progress), shapes.primary)
+                    .padding(horizontal = 16.dp),
+                contentAlignment = Alignment.CenterStart
             ) {
-                Text(
-                    text = task.id,
-                    color = colors.textMuted,
-                    fontSize = 9.sp,
-                    fontFamily = FontFamily.Monospace
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     Icon(
-                        imageVector = Icons.Default.Schedule,
-                        contentDescription = "Schedule",
-                        tint = if (task.scheduledDate != null) colors.accent2 else colors.textMuted,
-                        modifier = Modifier
-                            .size(15.dp)
-                            .clickable {
-                                com.example.util.AppHaptics.tick(context)
-                                onSchedule()
+                        imageVector = Icons.Default.Terminal,
+                        contentDescription = "To RAM",
+                        tint = colors.accent1,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = "→ ${Dict.get(terminology, "ram").uppercase()}",
+                        color = colors.accent1,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 1.sp
+                    )
+                }
+            }
+        } else if (isSwipingLeft) {
+            val progress = (-curOffset / thresholdPx).coerceIn(0f, 1f)
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .clip(shapes.primary)
+                    .background(colors.accent2.copy(alpha = 0.15f + 0.25f * progress))
+                    .border(1.dp, colors.accent2.copy(alpha = 0.4f + 0.6f * progress), shapes.primary)
+                    .padding(horizontal = 16.dp),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "${Dict.get(terminology, "cryo").uppercase()} ←",
+                        color = colors.accent2,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 1.sp
+                    )
+                    Icon(
+                        imageVector = Icons.Default.Storage,
+                        contentDescription = "To CRYO",
+                        tint = colors.accent2,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        }
+
+        // --- Foreground Card with Pointer Drag ---
+        Box(
+            modifier = Modifier
+                .offset { IntOffset(offsetX.value.roundToInt(), 0) }
+                .fillMaxWidth()
+                .clip(shapes.primary)
+                .background(colors.bgPanel)
+                .border(0.5.dp, colors.borderStrong.copy(alpha = 0.3f), shapes.primary)
+                .pointerInput(task.id) {
+                    detectHorizontalDragGestures(
+                        onDragStart = {
+                            hasHapticFired = false
+                        },
+                        onDragEnd = {
+                            val currentVal = offsetX.value
+                            if (currentVal >= thresholdPx) {
+                                coroutineScope.launch {
+                                    offsetX.animateTo(thresholdPx * 2.5f, tween(120))
+                                    com.example.util.AppHaptics.snap(context)
+                                    onMoveToRam()
+                                }
+                            } else if (currentVal <= -thresholdPx) {
+                                coroutineScope.launch {
+                                    offsetX.animateTo(-thresholdPx * 2.5f, tween(120))
+                                    com.example.util.AppHaptics.snap(context)
+                                    onMoveToCryo()
+                                }
+                            } else {
+                                coroutineScope.launch {
+                                    offsetX.animateTo(
+                                        0f,
+                                        spring(
+                                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                                            stiffness = Spring.StiffnessMedium
+                                        )
+                                    )
+                                }
                             }
+                        },
+                        onDragCancel = {
+                            coroutineScope.launch {
+                                offsetX.animateTo(0f)
+                            }
+                        },
+                        onHorizontalDrag = { change, dragAmount ->
+                            change.consume()
+                            val newVal = offsetX.value + dragAmount
+                            coroutineScope.launch {
+                                offsetX.snapTo(newVal)
+                            }
+                            if ((newVal >= thresholdPx || newVal <= -thresholdPx) && !hasHapticFired) {
+                                com.example.util.AppHaptics.tick(context)
+                                hasHapticFired = true
+                            } else if (newVal > -thresholdPx && newVal < thresholdPx) {
+                                hasHapticFired = false
+                            }
+                        }
+                    )
+                }
+                .padding(12.dp)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = task.id,
+                        color = colors.textMuted,
+                        fontSize = 9.sp,
+                        fontFamily = FontFamily.Monospace
                     )
                     Icon(
                         imageVector = Icons.Default.Edit,
@@ -354,98 +475,100 @@ private fun BufferTaskCard(
                             }
                     )
                 }
-            }
 
-            if (isEditing) {
-                BasicTextField(
-                    value = editValue,
-                    onValueChange = { editValue = it },
-                    textStyle = TextStyle(
-                        color = colors.textMain,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 13.sp
-                    ),
-                    cursorBrush = SolidColor(colors.accent1),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(
-                        onDone = { onSaveEdit(editValue) }
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(shapes.secondary)
-                        .background(colors.bgBase)
-                        .border(0.5.dp, colors.accent1, shapes.secondary)
-                        .padding(6.dp)
-                )
-            } else {
-                Text(
-                    text = task.title,
-                    color = colors.textMain,
-                    fontSize = 13.sp,
-                    fontFamily = FontFamily.Monospace
-                )
-            }
-
-            if (task.scheduledDate != null) {
-                Text(
-                    text = "T-FLUX: ${task.scheduledDate} ${task.scheduledTime ?: ""}".trim(),
-                    color = colors.accent2,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
-                    letterSpacing = 0.8.sp
-                )
-            }
-
-            // Bottom row: CRYO and RAM buttons
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 4.dp),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .clip(shapes.secondary)
-                        .background(colors.bgButton)
-                        .border(0.5.dp, colors.borderStrong.copy(alpha = 0.35f), shapes.secondary)
-                        .clickable {
-                            com.example.util.AppHaptics.snap(context)
-                            onMoveToCryo()
-                        }
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                    contentAlignment = Alignment.Center
-                ) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        text = Dict.get(terminology, "cryo").uppercase(),
+                        text = task.title,
                         color = colors.textMain,
-                        fontSize = 9.sp,
+                        fontSize = 13.sp,
                         fontFamily = FontFamily.Monospace
                     )
+
+                    // Subtasks badge
+                    if (task.subtasks.isNotEmpty()) {
+                        val doneCount = task.subtasks.count { it.done }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CheckBox,
+                                contentDescription = null,
+                                tint = colors.accent1,
+                                modifier = Modifier.size(11.dp)
+                            )
+                            Text(
+                                text = "SUBTASKS $doneCount/${task.subtasks.size}",
+                                color = colors.accent1,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
+
+                    if (task.scheduledDate != null) {
+                        Text(
+                            text = "T-FLUX: ${task.scheduledDate} ${task.scheduledTime ?: ""}".trim(),
+                            color = colors.accent2,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 0.8.sp
+                        )
+                    }
                 }
 
-                Spacer(modifier = Modifier.width(8.dp))
-
-                Box(
+                // Bottom row: CRYO and RAM buttons
+                Row(
                     modifier = Modifier
-                        .cyberGlow(colors.accent1, (colors.glowLevel * 0.4f).toInt(), radius = 6.dp)
-                        .clip(shapes.secondary)
-                        .background(colors.accentBrush)
-                        .clickable {
-                            com.example.util.AppHaptics.snap(context)
-                            onMoveToRam()
-                        }
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                    contentAlignment = Alignment.Center
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = Dict.get(terminology, "ram").uppercase(),
-                        color = colors.bgBase,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
-                    )
+                    Box(
+                        modifier = Modifier
+                            .clip(shapes.secondary)
+                            .background(colors.bgButton)
+                            .border(0.5.dp, colors.borderStrong.copy(alpha = 0.35f), shapes.secondary)
+                            .clickable {
+                                com.example.util.AppHaptics.snap(context)
+                                onMoveToCryo()
+                            }
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = Dict.get(terminology, "cryo").uppercase(),
+                            color = colors.textMain,
+                            fontSize = 9.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .cyberGlow(colors.accent1, (colors.glowLevel * 0.4f).toInt(), radius = 6.dp)
+                            .clip(shapes.secondary)
+                            .background(colors.accentBrush)
+                            .clickable {
+                                com.example.util.AppHaptics.snap(context)
+                                onMoveToRam()
+                            }
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = Dict.get(terminology, "ram").uppercase(),
+                            color = colors.bgBase,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
                 }
             }
         }

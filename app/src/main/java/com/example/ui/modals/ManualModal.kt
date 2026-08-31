@@ -98,6 +98,7 @@ fun ManualModal(
         }
 
         // --- Body Content ---
+        val isSystem = terminology == Terminology.SYSTEM
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -106,7 +107,7 @@ fun ManualModal(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "Добро пожаловать в ColdCache.OS. Это терминал управления когнитивной нагрузкой.",
+                text = if (isSystem) "Welcome to ColdCache.OS — cognitive load management terminal." else "Добро пожаловать в ColdCache.OS. Это терминал управления когнитивной нагрузкой.",
                 color = colors.textMain,
                 fontSize = 13.sp,
                 fontFamily = FontFamily.Monospace,
@@ -114,33 +115,33 @@ fun ManualModal(
             )
 
             ManualSection(
-                title = "1. ${Dict.get(terminology, "buffer")} (Буфер)",
-                desc = "Место для сброса хаоса. Возникла мысль или задача? Быстро записывай её сюда и закрывай терминал. Не держи в голове."
+                title = if (isSystem) "1. LATENT BUFFER" else "1. ВХОДЯЩИЕ МЫСЛИ",
+                desc = if (isSystem) "Cognitive scratchpad. Have a raw thought or task? Inject it instantly and clear your mind." else "Место для сброса мыслей. Возникла мысль или задача? Быстро записывай её сюда и закрывай терминал. Не держи в голове."
             )
 
             ManualSection(
-                title = "2. ${Dict.get(terminology, "ram")} (Слоты фокуса)",
-                desc = "То, что ты делаешь прямо сейчас. Жесткий лимит — 2 слота. Если пытаешься взять третью задачу, система не даст этого сделать, пока не освободишь память (появится предупреждение)."
+                title = if (isSystem) "2. ACTIVE RAM" else "2. В ФОКУСЕ (Слоты внимания)",
+                desc = if (isSystem) "High-priority execution. Strict 2-slot limit. Prevent cognitive overload." else "То, что ты делаешь прямо сейчас. Жесткий лимит — 2 слота. Защита от перегрузки."
             )
 
             ManualSection(
-                title = "3. ${Dict.get(terminology, "cryo")} (Отложенное)",
-                desc = "Задачи, которые нужно сделать, но не сегодня или не сейчас. Замораживай их здесь, чтобы они не мозолили глаза в фокусе."
+                title = if (isSystem) "3. CRYO-STORAGE" else "3. ОТЛОЖЕНО",
+                desc = if (isSystem) "Deferred tasks. Freeze low-urgency tasks to maintain laser focus on active nodes." else "Задачи, которые нужно сделать, но не сегодня или не сейчас. Замораживай их здесь, чтобы не отвлекали."
             )
 
             ManualSection(
-                title = "4. ${Dict.get(terminology, "render")} (Гиперфокус)",
-                desc = "Когда нажимаешь эту кнопку, задача разворачивается на весь экран. Внутри можно создать чек-лист микро-шагов. Если свернуть приложение, состояние рендера сохранится."
+                title = if (isSystem) "4. RENDER & FLOW BATTERY" else "4. НАЧАТЬ И РЕАКТОР ПОТОКА",
+                desc = if (isSystem) "Fullscreen hyperfocus mode with micro-step checklists and quantum energy tracker." else "Полноэкранный режим фокуса с чек-листом подзадач и трекером глубокой работы."
             )
 
             ManualSection(
-                title = "5. ${Dict.get(terminology, "temporal")} (Расписание)",
-                desc = "Модуль планирования. Позволяет привязать любую задачу из любого модуля к конкретной дате. Отображается в виде матрицы дат (сетка) или в режиме потока (ближайшие)."
+                title = if (isSystem) "5. TEMPORAL FLUX" else "5. КАЛЕНДАРЬ И ВРЕМЯ",
+                desc = if (isSystem) "Scheduling engine with Stream (chronological) and Matrix (calendar grid) views." else "Модуль планирования. Привязка задач к дате, просмотр в виде списка или календаря."
             )
 
             ManualSection(
-                title = "6. Daemons (Трекеры)",
-                desc = "Три верхние плашки для отслеживания рутины (шаги, вода, что угодно). Настраиваются индивидуально через меню параметров."
+                title = if (isSystem) "6. MODULAR DAEMONS" else "6. МОДУЛЬНЫЕ ТРЕКЕРЫ",
+                desc = if (isSystem) "Customizable background trackers for steps, water, habits, and metrics." else "Верхние плашки для отслеживания рутины (шаги, вода, привычки). Настраиваются в меню параметров."
             )
         }
 
@@ -165,7 +166,7 @@ fun ManualModal(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "ПОНЯТНО",
+                    text = if (isSystem) "ACKNOWLEDGED" else "ПОНЯТНО",
                     color = colors.textMain,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,

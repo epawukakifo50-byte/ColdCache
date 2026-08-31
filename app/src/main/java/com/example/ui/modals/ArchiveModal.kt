@@ -140,7 +140,7 @@ fun ArchiveModal(
                 )
                 Column {
                     Text(
-                        text = "CRYSTALLIZE",
+                        text = if (terminology == Terminology.SYSTEM) "CRYSTALLIZE" else "АРХИВ",
                         color = colors.textMain,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
@@ -148,7 +148,11 @@ fun ArchiveModal(
                         letterSpacing = 1.sp
                     )
                     Text(
-                        text = if (pagerState.currentPage == 0) "DATA: $totalRenderedData MB" else "STREAK: $streak DAYS • TOTAL: ${renderLog.size}",
+                        text = if (terminology == Terminology.SYSTEM) {
+                            if (pagerState.currentPage == 0) "DATA: $totalRenderedData MB" else "STREAK: $streak DAYS • TOTAL: ${renderLog.size}"
+                        } else {
+                            if (pagerState.currentPage == 0) "ОБЪЕМ: $totalRenderedData MB" else "СЕРИЯ: $streak ДНЕЙ • ВСЕГО: ${renderLog.size}"
+                        },
                         color = colors.accent1,
                         fontSize = 10.sp,
                         fontFamily = FontFamily.Monospace,
@@ -160,6 +164,7 @@ fun ArchiveModal(
             // Cyber Mode Switch (1v1 TemporalFlux style: LOG <-> MATRIX)
             CrystallizeModeSwitch(
                 currentPage = pagerState.currentPage,
+                terminology = terminology,
                 onSelectPage = { page ->
                     com.example.util.AppHaptics.toggle(context)
                     coroutineScope.launch {
@@ -196,7 +201,7 @@ fun ArchiveModal(
                                 modifier = Modifier.size(32.dp)
                             )
                             Text(
-                                text = "NO_CRYSTALLIZED_PROCESSES",
+                                text = if (terminology == Terminology.SYSTEM) "NO_CRYSTALLIZED_PROCESSES" else "НЕТ ЗАВЕРШЕННЫХ ЗАДАЧ",
                                 color = colors.textMuted,
                                 fontSize = 11.sp,
                                 fontFamily = FontFamily.Monospace,
@@ -625,10 +630,12 @@ fun ArchiveModal(
 @Composable
 fun CrystallizeModeSwitch(
     currentPage: Int,
+    terminology: Terminology = Terminology.SYSTEM,
     onSelectPage: (Int) -> Unit
 ) {
     val colors = LocalColdCacheColors.current
     val shapes = LocalColdCacheShapes.current
+    val isSystem = terminology == Terminology.SYSTEM
 
     val targetPos = if (currentPage == 1) 1f else 0f
     val indicatorBias by animateFloatAsState(
@@ -679,7 +686,7 @@ fun CrystallizeModeSwitch(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "LOG",
+                        text = if (isSystem) "LOG" else "ЖУРНАЛ",
                         color = if (currentPage == 0) colors.accent1 else colors.textMuted,
                         fontSize = 9.sp,
                         fontWeight = if (currentPage == 0) FontWeight.Bold else FontWeight.Medium,
@@ -697,7 +704,7 @@ fun CrystallizeModeSwitch(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "MATRIX",
+                        text = if (isSystem) "MATRIX" else "СЕТКА",
                         color = if (currentPage == 1) colors.accent1 else colors.textMuted,
                         fontSize = 9.sp,
                         fontWeight = if (currentPage == 1) FontWeight.Bold else FontWeight.Medium,

@@ -221,49 +221,6 @@ object NotificationHelper {
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
 
-        if (config.quickBufferInShade) {
-            // 1. Direct reply action directly in shade notification
-            val remoteInput = androidx.core.app.RemoteInput.Builder(DaemonActionReceiver.KEY_BUFFER_DIRECT_TEXT)
-                .setLabel("Мысль в BUFFER...")
-                .build()
-
-            val replyIntent = Intent(context, DaemonActionReceiver::class.java).apply {
-                action = DaemonActionReceiver.ACTION_DUMP_BUFFER
-            }
-            val replyPendingIntent = PendingIntent.getBroadcast(
-                context,
-                1001,
-                replyIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
-            )
-
-            val replyAction = NotificationCompat.Action.Builder(
-                android.R.drawable.ic_input_add,
-                "💬 В БУФЕР",
-                replyPendingIntent
-            ).addRemoteInput(remoteInput).build()
-
-            // 2. Open floating quick buffer dialog
-            val quickBufferIntent = Intent(context, com.example.QuickBufferActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            }
-            val quickBufferPendingIntent = PendingIntent.getActivity(
-                context,
-                1002,
-                quickBufferIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-
-            val quickAction = NotificationCompat.Action.Builder(
-                android.R.drawable.ic_menu_edit,
-                "+ ОКНО ВВОДА",
-                quickBufferPendingIntent
-            ).build()
-
-            builder.addAction(replyAction)
-            builder.addAction(quickAction)
-        }
-
         return builder.build()
     }
 

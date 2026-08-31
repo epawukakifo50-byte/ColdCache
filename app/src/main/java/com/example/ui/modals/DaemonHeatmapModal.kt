@@ -14,8 +14,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DirectionsWalk
-import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -33,7 +31,6 @@ import com.example.data.local.PreferenceManager
 import com.example.model.Daemon
 import com.example.model.DaemonType
 import com.example.model.getDaemonColor
-import com.example.sensor.HealthSyncManager
 import com.example.ui.components.DaemonIcon
 import com.example.ui.theme.LocalColdCacheColors
 import com.example.ui.theme.LocalColdCacheShapes
@@ -46,7 +43,6 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun DaemonHeatmapModal(
     daemon: Daemon,
-    onSyncHealth: (() -> Unit)? = null,
     onClose: () -> Unit
 ) {
     val colors = LocalColdCacheColors.current
@@ -73,7 +69,6 @@ fun DaemonHeatmapModal(
     }
 
     var selectedDate by remember { mutableStateOf<LocalDate?>(today) }
-    var isSyncing by remember { mutableStateOf(false) }
 
     // Generate 12 weeks (84 days) grid ending on current week's Sunday
     val daysGrid = remember(today) {
@@ -256,67 +251,6 @@ fun DaemonHeatmapModal(
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace
-                        )
-                    }
-                }
-            }
-
-            // Sync Health Action Button (if SENSOR_STEPS or requested)
-            if (daemon.type == DaemonType.SENSOR_STEPS) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(shapes.primary)
-                        .background(colors.bgPanel)
-                        .border(0.5.dp, dColor.copy(alpha = 0.6f), shapes.primary)
-                        .clickable {
-                            isSyncing = true
-                            com.example.util.AppHaptics.success(context)
-                            onSyncHealth?.invoke()
-                            coroutineScope.launch {
-                                kotlinx.coroutines.delay(800)
-                                isSyncing = false
-                            }
-                        }
-                        .padding(12.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.DirectionsWalk,
-                                contentDescription = null,
-                                tint = dColor,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Column {
-                                Text(
-                                    text = "SYNC GALAXY HEALTH",
-                                    color = colors.textMain,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace
-                                )
-                                Text(
-                                    text = "Pull total daily steps from Samsung Health",
-                                    color = colors.textMuted,
-                                    fontSize = 9.sp,
-                                    fontFamily = FontFamily.Monospace
-                                )
-                            }
-                        }
-
-                        Icon(
-                            imageVector = Icons.Default.Sync,
-                            contentDescription = "Sync",
-                            tint = if (isSyncing) dColor else colors.textMuted,
-                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }

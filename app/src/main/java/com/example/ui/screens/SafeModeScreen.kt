@@ -87,7 +87,7 @@ fun SafeModeScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "START",
+                    text = if (terminology == Terminology.SYSTEM) "INITIALIZE" else "НАЧАТЬ РАБОТУ",
                     color = colors.textMain,
                     fontSize = 12.sp,
                     fontFamily = FontFamily.Monospace,

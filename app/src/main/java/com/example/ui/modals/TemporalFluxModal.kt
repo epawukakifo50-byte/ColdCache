@@ -58,6 +58,8 @@ fun TemporalFluxModal(
     var calendarMonth by remember { mutableStateOf(Calendar.getInstance()) }
     var selectedDayTasks by remember { mutableStateOf<Pair<String, List<Task>>?>(null) }
 
+    val isSystem = terminology == Terminology.SYSTEM
+
     val scheduledTasks = remember(tasks) {
         tasks.filter { !it.scheduledDate.isNullOrBlank() }
             .sortedBy { "${it.scheduledDate} ${it.scheduledTime ?: "00:00"}" }
@@ -148,7 +150,7 @@ fun TemporalFluxModal(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "NO_TEMPORAL_DATA_DETECTED",
+                            text = if (isSystem) "NO_TEMPORAL_DATA_DETECTED" else "НЕТ ЗАПЛАНИРОВАННЫХ ЗАДАЧ",
                             color = colors.textMuted,
                             fontSize = 11.sp,
                             letterSpacing = 2.sp,
@@ -221,7 +223,11 @@ fun TemporalFluxModal(
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
-                                            text = task.state.name,
+                                            text = if (isSystem) task.state.name else when(task.state) {
+                                                TaskState.ACTIVE_RAM -> "В ФОКУСЕ"
+                                                TaskState.CRYO -> "ОТЛОЖЕНО"
+                                                TaskState.BUFFER -> "ВХОДЯЩИЕ"
+                                            },
                                             color = stateColor,
                                             fontSize = 9.sp,
                                             fontWeight = FontWeight.Bold,
@@ -235,7 +241,7 @@ fun TemporalFluxModal(
                 }
             } else {
                 // === MATRIX (CALENDAR GRID) MODE ===
-                val monthFormat = SimpleDateFormat("MMMM yyyy", Locale.US)
+                val monthFormat = SimpleDateFormat("MMMM yyyy", if (isSystem) Locale.US else Locale("ru"))
                 val cal = calendarMonth.clone() as Calendar
                 cal.set(Calendar.DAY_OF_MONTH, 1)
                 val monthName = monthFormat.format(cal.time).uppercase()
@@ -309,7 +315,12 @@ fun TemporalFluxModal(
 
                     // Days of week header
                     Row(modifier = Modifier.fillMaxWidth()) {
-                        listOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN").forEach { day ->
+                        val dayNames = if (isSystem) {
+                            listOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
+                        } else {
+                            listOf("ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ", "ВС")
+                        }
+                        dayNames.forEach { day ->
                             Text(
                                 text = day,
                                 color = colors.textMuted,
@@ -423,7 +434,7 @@ fun TemporalFluxModal(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "CLOSE",
+                    text = if (isSystem) "CLOSE" else "ЗАКРЫТЬ",
                     color = colors.textMain,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
@@ -502,7 +513,11 @@ fun TemporalFluxModal(
                                         fontFamily = FontFamily.Monospace
                                     )
                                     Text(
-                                        text = task.state.name,
+                                        text = if (isSystem) task.state.name else when(task.state) {
+                                            TaskState.ACTIVE_RAM -> "В ФОКУСЕ"
+                                            TaskState.CRYO -> "ОТЛОЖЕНО"
+                                            TaskState.BUFFER -> "ВХОДЯЩИЕ"
+                                        },
                                         color = taskColor,
                                         fontSize = 9.sp,
                                         fontFamily = FontFamily.Monospace
@@ -527,7 +542,7 @@ fun TemporalFluxModal(
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
-                                            text = "TO RAM",
+                                            text = if (isSystem) "TO RAM" else "В ФОКУС",
                                             color = colors.accent1,
                                             fontSize = 9.sp,
                                             fontWeight = FontWeight.Bold,
@@ -549,8 +564,8 @@ fun TemporalFluxModal(
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
-                                            text = "TO CRYO",
-                                            color = colors.textMain,
+                                            text = if (isSystem) "TO CRYO" else "ОТЛОЖИТЬ",
+                                            color = colors.accent2,
                                             fontSize = 9.sp,
                                             fontWeight = FontWeight.Bold,
                                             fontFamily = FontFamily.Monospace

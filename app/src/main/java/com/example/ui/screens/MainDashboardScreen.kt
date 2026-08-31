@@ -52,8 +52,7 @@ fun MainDashboardScreen(
     schedulingTask: Task?,
     ramOverflowTask: Task?,
     editingTaskId: String?,
-    isBufferReversed: Boolean,
-    onSyncHealth: (() -> Unit)? = null
+    isBufferReversed: Boolean
 ) {
     val colors = LocalColdCacheColors.current
     val shapes = LocalColdCacheShapes.current
@@ -61,6 +60,7 @@ fun MainDashboardScreen(
 
     val scheduledCount = allTasks.count { !it.scheduledDate.isNullOrBlank() }
     val selectedHeatmapDaemon by viewModel.selectedHeatmapDaemon.collectAsState()
+    val editingTask by viewModel.editingTask.collectAsState()
 
     val modalEnter = fadeIn(tween(220)) +
             slideInVertically(
@@ -189,36 +189,25 @@ fun MainDashboardScreen(
             ActiveRamPanel(
                 tasks = activeRamTasks,
                 terminology = config.terminology,
-                editingTaskId = editingTaskId,
                 onStartEdit = { viewModel.startEditTask(it) },
-                onSaveEdit = { id, title -> viewModel.saveEditTask(id, title) },
-                onCancelEdit = { viewModel.cancelEditTask() },
                 onMoveToCryo = { viewModel.moveTask(it, TaskState.CRYO) },
-                onStartCompilation = { viewModel.startCompilation(it) },
-                onScheduleTask = { viewModel.setSchedulingTask(it) }
+                onStartCompilation = { viewModel.startCompilation(it) }
             )
 
             // --- Cryo Storage Panel ---
             CryoStoragePanel(
                 tasks = cryoTasks,
                 terminology = config.terminology,
-                editingTaskId = editingTaskId,
                 onStartEdit = { viewModel.startEditTask(it) },
-                onSaveEdit = { id, title -> viewModel.saveEditTask(id, title) },
-                onCancelEdit = { viewModel.cancelEditTask() },
-                onMoveToRam = { viewModel.moveTask(it, TaskState.ACTIVE_RAM) },
-                onDropTask = { viewModel.dropTask(it) },
-                onScheduleTask = { viewModel.setSchedulingTask(it) }
+                onMoveToRam = { viewModel.moveTask(it, TaskState.ACTIVE_RAM) }
             )
 
             Spacer(modifier = Modifier.height(70.dp))
         }
 
-        // --- Pinned Bottom DevNull Console ---
+        // --- Pinned Bottom DevNull Console & Void Entity Overlay ---
         DevNullConsole(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(14.dp)
+            modifier = Modifier.fillMaxSize()
         )
 
         // --- Animated Modals ---
@@ -238,10 +227,7 @@ fun MainDashboardScreen(
                     viewModel.moveTask(it, TaskState.ACTIVE_RAM)
                     viewModel.openBuffer(false)
                 },
-                onScheduleTask = { viewModel.setSchedulingTask(it) },
-                editingTaskId = editingTaskId,
                 onStartEdit = { viewModel.startEditTask(it) },
-                onSaveEdit = { id, title -> viewModel.saveEditTask(id, title) },
                 onClose = { viewModel.openBuffer(false) }
             )
         }
@@ -307,10 +293,11 @@ fun MainDashboardScreen(
                 onUpdateDaemonFull = { daemon ->
                     viewModel.updateDaemonFull(daemon)
                 },
-                onSyncHealth = onSyncHealth ?: { viewModel.syncWithHealthConnect() },
                 onExportDump = { viewModel.exportMemoryDumpJson() },
                 onImportDump = { viewModel.importMemoryDumpJson(it) },
                 onExportMarkdown = { viewModel.exportMarkdownJournal() },
+                onPerformEncryptedBackup = { viewModel.performManualEncryptedBackup() },
+                onRestoreEncryptedBackup = { viewModel.restoreEncryptedBackup(it) },
                 onClose = { viewModel.openSettings(false) }
             )
         }
@@ -334,7 +321,6 @@ fun MainDashboardScreen(
             selectedHeatmapDaemon?.let { daemon ->
                 com.example.ui.modals.DaemonHeatmapModal(
                     daemon = daemon,
-                    onSyncHealth = onSyncHealth ?: { viewModel.syncWithHealthConnect() },
                     onClose = { viewModel.openDaemonHeatmap(null) }
                 )
             }
@@ -348,13 +334,32 @@ fun MainDashboardScreen(
             )
         }
 
-        ramOverflowTask?.let { task ->
-            RamOverflowDialog(
+        editingTask?.let { task ->
+            TaskEditModal(
                 task = task,
                 terminology = config.terminology,
-                onDismiss = { viewModel.setRamOverflowTask(null) },
+                onSave = { updated -> viewModel.saveTaskDetails(updated) },
+                onDrop = { id ->
+                    viewModel.dropTask(id)
+                    viewModel.closeEditTask()
+                },
+                onClose = { viewModel.closeEditTask() }
+            )
+        }
+
+        ramOverflowTask?.let { task ->
+            RamOverflowDialog(
+                incomingTask = task,
+                currentRamTasks = activeRamTasks,
+                terminology = config.terminology,
+                onReplaceRamTask = { ramTaskToReplace ->
+                    viewModel.replaceRamTask(ramTaskToReplace, task)
+                },
                 onMoveToCryo = {
                     viewModel.moveTask(task.id, TaskState.CRYO)
+                    viewModel.setRamOverflowTask(null)
+                },
+                onKeepInBuffer = {
                     viewModel.setRamOverflowTask(null)
                 }
             )

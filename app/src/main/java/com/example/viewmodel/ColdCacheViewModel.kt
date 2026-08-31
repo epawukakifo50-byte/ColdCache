@@ -10,6 +10,8 @@ import com.example.model.*
 import com.example.service.DaemonTrackerService
 import com.example.service.TaskScheduler
 import com.example.widget.ColdCacheWidgetProvider
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import org.json.JSONArray
@@ -102,8 +104,9 @@ class ColdCacheViewModel(
     val ramOverflowTask: StateFlow<Task?> = _ramOverflowTask.asStateFlow()
 
     // --- In-place Editing & DevNull ---
-    private val _editingTaskId = MutableStateFlow<String?>(null)
-    val editingTaskId: StateFlow<String?> = _editingTaskId.asStateFlow()
+    private val _editingTask = MutableStateFlow<Task?>(null)
+    val editingTask: StateFlow<Task?> = _editingTask.asStateFlow()
+    val editingTaskId: StateFlow<String?> = _editingTask.map { it?.id }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     private val _isBufferReversed = MutableStateFlow(true)
     val isBufferReversed: StateFlow<Boolean> = _isBufferReversed.asStateFlow()
@@ -162,6 +165,14 @@ class ColdCacheViewModel(
                         TaskScheduler.cancelRamIdleAlarm(appContext)
                     }
                 }
+            }
+        }
+
+        // Automatic weekly encrypted backup check
+        viewModelScope.launch(Dispatchers.IO) {
+            delay(3000)
+            com.example.util.EncryptedBackupManager.checkAndPerformWeeklyBackup(appContext) {
+                exportMemoryDumpJson()
             }
         }
     }
@@ -232,34 +243,6 @@ class ColdCacheViewModel(
             syncExternalViews()
         }
         startListening()
-    }
-
-    val healthSyncManager = com.example.sensor.HealthSyncManager(appContext)
-
-    fun syncWithHealthConnect(onComplete: ((Boolean, Long?) -> Unit)? = null) {
-        viewModelScope.launch {
-            android.util.Log.d("ColdCache", "Syncing with Health Connect...")
-            val steps = healthSyncManager.getTodayStepsFromHealth()
-            android.util.Log.d("ColdCache", "Health Connect steps result: $steps")
-            if (steps != null) {
-                // steps can be 0 (valid — no steps recorded yet today)
-                val currentDaemons = _daemons.value.toMutableMap()
-                currentDaemons.forEach { (key, daemon) ->
-                    if (daemon.type == DaemonType.SENSOR_STEPS) {
-                        currentDaemons[key] = daemon.copy(current = steps.toInt())
-                    }
-                }
-                _daemons.value = OrderedDaemonMap(currentDaemons)
-                prefManager.saveDaemons(currentDaemons)
-                syncExternalViews()
-                com.example.util.AppHaptics.success(appContext, _systemConfig.value.hapticFeedbackEnabled)
-                onComplete?.invoke(true, steps)
-            } else {
-                android.util.Log.w("ColdCache", "Health Connect returned null (no permission or not available)")
-                com.example.util.AppHaptics.tick(appContext, _systemConfig.value.hapticFeedbackEnabled)
-                onComplete?.invoke(false, null)
-            }
-        }
     }
 
     fun addCustomDaemon(label: String, max: Int, step: Int, iconName: String, type: DaemonType = DaemonType.MANUAL, colorHex: String? = null) {
@@ -346,7 +329,29 @@ class ColdCacheViewModel(
     }
 
     fun startEditTask(task: Task) {
-        _editingTaskId.value = task.id
+        _editingTask.value = task
+    }
+
+    fun closeEditTask() {
+        _editingTask.value = null
+    }
+
+    fun saveTaskDetails(updatedTask: Task) {
+        viewModelScope.launch {
+            repository.updateTask(updatedTask)
+            if (_activeColliderTask.value?.id == updatedTask.id) {
+                _activeColliderTask.value = updatedTask
+            }
+            if (_systemConfig.value.taskRemindersEnabled) {
+                if (updatedTask.scheduledDate.isNullOrBlank()) {
+                    TaskScheduler.cancelTaskReminders(appContext, updatedTask.id)
+                } else {
+                    TaskScheduler.scheduleTaskReminders(appContext, updatedTask)
+                }
+            }
+            com.example.util.AppHaptics.snap(appContext, _systemConfig.value.hapticFeedbackEnabled)
+        }
+        _editingTask.value = null
     }
 
     fun saveEditTask(taskId: String, newTitle: String) {
@@ -354,15 +359,19 @@ class ColdCacheViewModel(
             viewModelScope.launch {
                 val current = allActiveTasks.value.find { it.id == taskId }
                 if (current != null) {
-                    repository.updateTask(current.copy(title = newTitle.trim()))
+                    val updated = current.copy(title = newTitle.trim())
+                    repository.updateTask(updated)
+                    if (_activeColliderTask.value?.id == taskId) {
+                        _activeColliderTask.value = updated
+                    }
                 }
             }
         }
-        _editingTaskId.value = null
+        _editingTask.value = null
     }
 
     fun cancelEditTask() {
-        _editingTaskId.value = null
+        _editingTask.value = null
     }
 
     fun moveTask(taskId: String, targetState: TaskState) {
@@ -379,6 +388,33 @@ class ColdCacheViewModel(
             repository.moveTask(task, targetState)
             com.example.util.AppHaptics.snap(appContext, _systemConfig.value.hapticFeedbackEnabled)
         }
+    }
+
+    fun replaceRamTask(ramTaskToCryo: Task, incomingTask: Task) {
+        viewModelScope.launch {
+            repository.moveTask(ramTaskToCryo, TaskState.CRYO)
+            repository.moveTask(incomingTask, TaskState.ACTIVE_RAM)
+            _ramOverflowTask.value = null
+            com.example.util.AppHaptics.snap(appContext, _systemConfig.value.hapticFeedbackEnabled)
+        }
+    }
+
+    fun performManualEncryptedBackup(): java.io.File? {
+        val dump = exportMemoryDumpJson()
+        val file = com.example.util.EncryptedBackupManager.createEncryptedBackup(appContext, dump)
+        if (file != null) {
+            com.example.util.AppHaptics.success(appContext, _systemConfig.value.hapticFeedbackEnabled)
+        }
+        return file
+    }
+
+    fun restoreEncryptedBackup(file: java.io.File): Boolean {
+        val json = com.example.util.EncryptedBackupManager.decryptBackupFile(file) ?: return false
+        val success = importMemoryDumpJson(json)
+        if (success) {
+            com.example.util.AppHaptics.success(appContext, _systemConfig.value.hapticFeedbackEnabled)
+        }
+        return success
     }
 
     fun dropTask(taskId: String) {
@@ -425,6 +461,19 @@ class ColdCacheViewModel(
         com.example.util.AppHaptics.click(appContext, _systemConfig.value.hapticFeedbackEnabled)
     }
 
+    // Task Focus Elapsed Seconds (Persisted in SharedPreferences so quanta never reset)
+    fun getTaskFocusSeconds(taskId: String): Int {
+        return prefManager.loadTaskFocusSeconds(taskId)
+    }
+
+    fun saveTaskFocusSeconds(taskId: String, seconds: Int) {
+        prefManager.saveTaskFocusSeconds(taskId, seconds)
+    }
+
+    fun clearTaskFocusSeconds(taskId: String) {
+        prefManager.clearTaskFocusSeconds(taskId)
+    }
+
     fun exitCompilation(targetState: TaskState) {
         val task = _activeColliderTask.value
         if (task != null) {
@@ -447,6 +496,7 @@ class ColdCacheViewModel(
                 completedAt = timestamp,
                 progress = 100
             )
+            prefManager.clearTaskFocusSeconds(task.id)
             viewModelScope.launch {
                 repository.archiveTask(completed)
                 TaskScheduler.cancelTaskReminders(appContext, task.id)
@@ -552,6 +602,7 @@ class ColdCacheViewModel(
     fun toggleBufferReversed() { _isBufferReversed.value = !_isBufferReversed.value }
 
     fun closeAllModals(): Boolean {
+        if (_editingTask.value != null) { _editingTask.value = null; return true }
         if (_selectedHeatmapDaemon.value != null) { _selectedHeatmapDaemon.value = null; return true }
         if (_schedulingTask.value != null) { _schedulingTask.value = null; return true }
         if (_ramOverflowTask.value != null) { _ramOverflowTask.value = null; return true }

@@ -34,7 +34,6 @@ import com.example.ui.screens.SafeModeScreen
 import com.example.ui.theme.ColdCacheTheme
 import com.example.viewmodel.ColdCacheViewModel
 import com.example.viewmodel.ColdCacheViewModelFactory
-import androidx.health.connect.client.HealthConnectClient
 
 class MainActivity : ComponentActivity() {
 
@@ -82,90 +81,6 @@ class MainActivity : ComponentActivity() {
             ) { results ->
                 if (results[Manifest.permission.POST_NOTIFICATIONS] == true && systemConfig.daemonShadeTracker) {
                     com.example.service.NotificationHelper.showOrUpdateDaemonNotification(applicationContext)
-                }
-            }
-
-            val healthPermissionsLauncher = rememberLauncherForActivityResult(
-                contract = androidx.health.connect.client.PermissionController.createRequestPermissionResultContract()
-            ) { granted ->
-                android.util.Log.d("ColdCache", "Health Connect permissions dialog result: $granted")
-                if (granted.containsAll(viewModel.healthSyncManager.permissions)) {
-                    // Permission was granted — sync immediately
-                    viewModel.syncWithHealthConnect { success, steps ->
-                        if (success) {
-                            android.widget.Toast.makeText(this@MainActivity, "✓ Galaxy Health: синхронизировано $steps шагов", android.widget.Toast.LENGTH_SHORT).show()
-                        } else {
-                            android.widget.Toast.makeText(this@MainActivity, "Galaxy Health: данных за сегодня нет (0 шагов)", android.widget.Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                } else {
-                    // User denied — guide them to Samsung Health settings
-                    android.widget.Toast.makeText(
-                        this@MainActivity,
-                        "Откройте Samsung Health → … → Разрешения → ColdCache → Включите «Шаги»",
-                        android.widget.Toast.LENGTH_LONG
-                    ).show()
-                }
-            }
-
-            val triggerGalaxyHealthSync: () -> Unit = {
-                lifecycleScope.launchWhenStarted {
-                    android.util.Log.d("ColdCache", "triggerGalaxyHealthSync called")
-                    val sdkStatus = try {
-                        HealthConnectClient.getSdkStatus(this@MainActivity)
-                    } catch (_: Exception) { -1 }
-                    android.util.Log.d("ColdCache", "Health Connect SDK status: $sdkStatus")
-
-                    when (sdkStatus) {
-                        HealthConnectClient.SDK_UNAVAILABLE -> {
-                            // Truly not available — open Play Store for Health Connect
-                            android.widget.Toast.makeText(
-                                this@MainActivity,
-                                "Установите Health Connect из Play Store и откройте его один раз",
-                                android.widget.Toast.LENGTH_LONG
-                            ).show()
-                            try {
-                                val intent = android.content.Intent(
-                                    android.content.Intent.ACTION_VIEW,
-                                    android.net.Uri.parse("market://details?id=com.google.android.apps.healthdata")
-                                ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                                startActivity(intent)
-                            } catch (_: Exception) {}
-                        }
-                        HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED -> {
-                            // Needs update — redirect to Play Store to update Health Connect
-                            android.widget.Toast.makeText(
-                                this@MainActivity,
-                                "Обновите Health Connect в Play Store и попробуйте снова",
-                                android.widget.Toast.LENGTH_LONG
-                            ).show()
-                            try {
-                                val intent = android.content.Intent(
-                                    android.content.Intent.ACTION_VIEW,
-                                    android.net.Uri.parse("market://details?id=com.google.android.apps.healthdata")
-                                ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                                startActivity(intent)
-                            } catch (_: Exception) {}
-                        }
-                        else -> {
-                            // SDK_AVAILABLE or unknown — try to get/request permissions directly
-                            val hasPerms = viewModel.healthSyncManager.hasPermissions()
-                            android.util.Log.d("ColdCache", "hasPermissions: $hasPerms")
-                            if (!hasPerms) {
-                                android.util.Log.d("ColdCache", "Launching Health Connect permission dialog")
-                                healthPermissionsLauncher.launch(viewModel.healthSyncManager.permissions)
-                            } else {
-                                android.util.Log.d("ColdCache", "Already has permissions, syncing now")
-                                viewModel.syncWithHealthConnect { success, steps ->
-                                    if (success) {
-                                        android.widget.Toast.makeText(this@MainActivity, "✓ Galaxy Health: $steps шагов", android.widget.Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        android.widget.Toast.makeText(this@MainActivity, "Galaxy Health: 0 шагов записано сегодня", android.widget.Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            }
-                        }
-                    }
                 }
             }
 
@@ -227,16 +142,19 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         systemState == AppSystemState.COMPILING && activeColliderTask != null -> {
+                            val currentTask = activeColliderTask!!
                             CompilingScreen(
-                                task = activeColliderTask!!,
+                                task = currentTask,
                                 terminology = systemConfig.terminology,
+                                initialFocusSeconds = viewModel.getTaskFocusSeconds(currentTask.id),
+                                onSaveFocusSeconds = { sec -> viewModel.saveTaskFocusSeconds(currentTask.id, sec) },
                                 onUpdateProgress = { viewModel.updateProgress(it) },
                                 onToggleSubtask = { viewModel.toggleSubtask(it) },
                                 onAddSubtask = { viewModel.addSubtask(it) },
                                 onDeleteSubtask = { viewModel.deleteSubtask(it) },
                                 onUpdateSubtask = { id, text -> viewModel.updateSubtask(id, text) },
                                 onReorderSubtask = { from, to -> viewModel.reorderSubtasks(from, to) },
-                                onScheduleTask = { viewModel.setSchedulingTask(activeColliderTask) },
+                                onScheduleTask = { viewModel.setSchedulingTask(currentTask) },
                                 onExit = { targetState -> viewModel.exitCompilation(targetState) },
                                 onFinish = { viewModel.finishCompilation() }
                             )
@@ -268,8 +186,7 @@ class MainActivity : ComponentActivity() {
                                 schedulingTask = schedulingTask,
                                 ramOverflowTask = ramOverflowTask,
                                 editingTaskId = editingTaskId,
-                                isBufferReversed = isBufferReversed,
-                                onSyncHealth = triggerGalaxyHealthSync
+                                isBufferReversed = isBufferReversed
                             )
                         }
                     }

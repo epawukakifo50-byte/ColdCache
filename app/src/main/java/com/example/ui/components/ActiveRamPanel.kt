@@ -7,27 +7,22 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Memory
-import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.Dict
@@ -41,13 +36,9 @@ import com.example.ui.theme.cyberGlow
 fun ActiveRamPanel(
     tasks: List<Task>,
     terminology: Terminology,
-    editingTaskId: String?,
     onStartEdit: (Task) -> Unit,
-    onSaveEdit: (String, String) -> Unit,
-    onCancelEdit: () -> Unit,
     onMoveToCryo: (String) -> Unit,
-    onStartCompilation: (Task) -> Unit,
-    onScheduleTask: (Task) -> Unit
+    onStartCompilation: (Task) -> Unit
 ) {
     val colors = LocalColdCacheColors.current
     val shapes = LocalColdCacheShapes.current
@@ -81,7 +72,7 @@ fun ActiveRamPanel(
             )
             Spacer(modifier = Modifier.weight(1f))
             Text(
-                text = "СЛОТЫ: ${tasks.size}/2",
+                text = if (terminology == Terminology.SYSTEM) "SLOTS: ${tasks.size}/2" else "СЛОТЫ: ${tasks.size}/2",
                 color = if (tasks.size >= 2) colors.accent2 else colors.textMuted,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -113,13 +104,9 @@ fun ActiveRamPanel(
                 ActiveRamCard(
                     task = task,
                     terminology = terminology,
-                    isEditing = editingTaskId == task.id,
                     onStartEdit = { onStartEdit(task) },
-                    onSaveEdit = { newTitle -> onSaveEdit(task.id, newTitle) },
-                    onCancelEdit = onCancelEdit,
                     onMoveToCryo = { onMoveToCryo(task.id) },
-                    onStartCompilation = { onStartCompilation(task) },
-                    onSchedule = { onScheduleTask(task) }
+                    onStartCompilation = { onStartCompilation(task) }
                 )
             }
         }
@@ -130,18 +117,13 @@ fun ActiveRamPanel(
 private fun ActiveRamCard(
     task: Task,
     terminology: Terminology,
-    isEditing: Boolean,
     onStartEdit: () -> Unit,
-    onSaveEdit: (String) -> Unit,
-    onCancelEdit: () -> Unit,
     onMoveToCryo: () -> Unit,
-    onStartCompilation: () -> Unit,
-    onSchedule: () -> Unit
+    onStartCompilation: () -> Unit
 ) {
     val colors = LocalColdCacheColors.current
     val shapes = LocalColdCacheShapes.current
-    val context = androidx.compose.ui.platform.LocalContext.current
-    var editValue by remember(task.title, isEditing) { mutableStateOf(task.title) }
+    val context = LocalContext.current
 
     val animatedProgress by animateFloatAsState(
         targetValue = (task.progress / 100f).coerceIn(0f, 1f),
@@ -173,7 +155,7 @@ private fun ActiveRamCard(
                 .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // ID & Action icons
+            // ID & Edit icon
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -187,55 +169,21 @@ private fun ActiveRamCard(
                     fontFamily = FontFamily.Monospace,
                     letterSpacing = 1.sp
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Icon(
-                        imageVector = Icons.Default.Schedule,
-                        contentDescription = "Schedule",
-                        tint = if (task.scheduledDate != null) colors.accent2 else colors.textMuted,
-                        modifier = Modifier
-                            .size(16.dp)
-                            .clickable {
-                                com.example.util.AppHaptics.tick(context)
-                                onSchedule()
-                            }
-                    )
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "Edit",
-                        tint = colors.textMuted,
-                        modifier = Modifier
-                            .size(16.dp)
-                            .clickable {
-                                com.example.util.AppHaptics.tick(context)
-                                onStartEdit()
-                            }
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = "Edit",
+                    tint = colors.textMuted,
+                    modifier = Modifier
+                        .size(16.dp)
+                        .clickable {
+                            com.example.util.AppHaptics.tick(context)
+                            onStartEdit()
+                        }
+                )
             }
 
-            // Title or Edit Input
-            if (isEditing) {
-                BasicTextField(
-                    value = editValue,
-                    onValueChange = { editValue = it },
-                    textStyle = TextStyle(
-                        color = colors.textMain,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 14.sp
-                    ),
-                    cursorBrush = SolidColor(colors.accent1),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(
-                        onDone = { onSaveEdit(editValue) }
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(shapes.secondary)
-                        .background(colors.bgBase)
-                        .border(0.5.dp, colors.accent1, shapes.secondary)
-                        .padding(8.dp)
-                )
-            } else {
+            // Title & subtasks badge
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     text = task.title,
                     color = colors.textMain,
@@ -243,18 +191,41 @@ private fun ActiveRamCard(
                     fontWeight = FontWeight.SemiBold,
                     fontFamily = FontFamily.Monospace
                 )
-            }
 
-            // Scheduled Date display
-            if (task.scheduledDate != null) {
-                Text(
-                    text = "T-FLUX: ${task.scheduledDate} ${task.scheduledTime ?: ""}".trim(),
-                    color = colors.accent2,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
-                    letterSpacing = 0.8.sp
-                )
+                // Subtasks progress badge
+                if (task.subtasks.isNotEmpty()) {
+                    val doneCount = task.subtasks.count { it.done }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CheckBox,
+                            contentDescription = null,
+                            tint = colors.accent1,
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Text(
+                            text = "${if (terminology == Terminology.SYSTEM) "SUBTASKS" else "ПОДЗАДАЧИ"} $doneCount/${task.subtasks.size} (${task.progress}%)",
+                            color = colors.accent1,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+
+                // Scheduled Date display
+                if (task.scheduledDate != null) {
+                    Text(
+                        text = "T-FLUX: ${task.scheduledDate} ${task.scheduledTime ?: ""}".trim(),
+                        color = colors.accent2,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 0.8.sp
+                    )
+                }
             }
 
             // Bottom Buttons: Move to Cryo & Render (Hyperfocus)
