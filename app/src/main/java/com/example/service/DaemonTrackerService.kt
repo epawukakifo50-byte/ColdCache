@@ -63,21 +63,23 @@ class DaemonTrackerService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    private val stepListener: (Int) -> Unit = {
+        val prefManager = PreferenceManager(applicationContext)
+        updateNotification(applicationContext, prefManager.loadDaemons())
+    }
+
     override fun onCreate() {
         super.onCreate()
         NotificationHelper.createNotificationChannels(this)
-        stepSensorManager = com.example.sensor.StepSensorManager(applicationContext).apply {
-            onStepsUpdated = {
-                val prefManager = PreferenceManager(applicationContext)
-                updateNotification(applicationContext, prefManager.loadDaemons())
-            }
+        stepSensorManager = com.example.sensor.StepSensorManager.getInstance(applicationContext).apply {
+            addListener(stepListener)
             startListening()
         }
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        stepSensorManager?.stopListening()
+        stepSensorManager?.removeListener(stepListener)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

@@ -27,12 +27,22 @@ import kotlin.math.sqrt
  *     baseline = (totalSinceBoot - N).
  *   - Falls back to TYPE_STEP_DETECTOR (+1 per pulse) or accelerometer if STEP_COUNTER is unavailable.
  */
-class StepSensorManager(private val context: Context) : SensorEventListener {
+class StepSensorManager private constructor(private val context: Context) : SensorEventListener {
 
     companion object {
         private const val TAG = "StepSensorManager"
         private const val KEY_STEP_BASELINE_SENSOR = "cc_step_baseline_sensor"
         private const val KEY_STEP_BASELINE_DATE = "cc_step_baseline_date"
+        private const val KEY_STEP_BASELINE_SET = "cc_step_baseline_set"
+
+        @Volatile
+        private var instance: StepSensorManager? = null
+
+        fun getInstance(context: Context): StepSensorManager {
+            return instance ?: synchronized(this) {
+                instance ?: StepSensorManager(context.applicationContext).also { instance = it }
+            }
+        }
     }
 
     private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
@@ -42,7 +52,25 @@ class StepSensorManager(private val context: Context) : SensorEventListener {
     private val prefManager = PreferenceManager(context)
     private val prefs = context.getSharedPreferences("coldcache_prefs", Context.MODE_PRIVATE)
 
+    private val listeners = java.util.concurrent.CopyOnWriteArrayList<(Int) -> Unit>()
+
     var onStepsUpdated: ((Int) -> Unit)? = null
+        set(value) {
+            field = value
+            if (value != null && !listeners.contains(value)) {
+                listeners.add(value)
+            }
+        }
+
+    fun addListener(listener: (Int) -> Unit) {
+        if (!listeners.contains(listener)) {
+            listeners.add(listener)
+        }
+    }
+
+    fun removeListener(listener: (Int) -> Unit) {
+        listeners.remove(listener)
+    }
 
     // --- Step Detector fallback state ---
     private var lastAccelMagnitude = 9.8f
@@ -50,15 +78,21 @@ class StepSensorManager(private val context: Context) : SensorEventListener {
 
     // --- Step Counter baseline state (in-memory) ---
     @Volatile
-    private var baselineSensorValue = -1L
+    private var baselineSensorValue = 0L
+    @Volatile
+    private var isBaselineInitialized = false
     @Volatile
     private var activeBaselineDate = ""
     @Volatile
     private var lastKnownSensorTotal = -1L
+    @Volatile
+    private var isListening = false
 
     fun isStepSensorAvailable() = stepCounterSensor != null || stepDetectorSensor != null || accelSensor != null
 
+    @Synchronized
     fun startListening() {
+        if (isListening) return
         restoreBaseline()
         var registered = false
 
@@ -80,12 +114,16 @@ class StepSensorManager(private val context: Context) : SensorEventListener {
                 Log.d(TAG, "Successfully registered TYPE_ACCELEROMETER fallback")
             }
         }
+        isListening = registered
     }
 
+    @Synchronized
     fun stopListening() {
         sensorManager?.unregisterListener(this)
+        isListening = false
     }
 
+    @Synchronized
     fun restartListening() {
         stopListening()
         startListening()
@@ -95,13 +133,15 @@ class StepSensorManager(private val context: Context) : SensorEventListener {
     private fun restoreBaseline() {
         val today = todayString()
         val savedDate = prefs.getString(KEY_STEP_BASELINE_DATE, null)
-        if (savedDate == today) {
-            baselineSensorValue = prefs.getLong(KEY_STEP_BASELINE_SENSOR, -1L)
+        val isSet = prefs.getBoolean(KEY_STEP_BASELINE_SET, false)
+        if (savedDate == today && isSet) {
+            baselineSensorValue = prefs.getLong(KEY_STEP_BASELINE_SENSOR, 0L)
+            isBaselineInitialized = true
             activeBaselineDate = today
             Log.d(TAG, "Restored baseline: $baselineSensorValue for $today")
         } else {
             // New day detected on launch
-            baselineSensorValue = -1L
+            isBaselineInitialized = false
             activeBaselineDate = today
             Log.d(TAG, "New day detected on start, baseline will initialize on next sensor event")
         }
@@ -112,8 +152,10 @@ class StepSensorManager(private val context: Context) : SensorEventListener {
         prefs.edit()
             .putLong(KEY_STEP_BASELINE_SENSOR, sensorValue)
             .putString(KEY_STEP_BASELINE_DATE, date)
+            .putBoolean(KEY_STEP_BASELINE_SET, true)
             .apply()
         baselineSensorValue = sensorValue
+        isBaselineInitialized = true
         activeBaselineDate = date
         Log.d(TAG, "Baseline saved: sensorValue=$sensorValue, date=$date")
     }
@@ -124,19 +166,20 @@ class StepSensorManager(private val context: Context) : SensorEventListener {
         val sensorTotal = if (lastKnownSensorTotal > 0L) {
             lastKnownSensorTotal
         } else {
-            val savedBaseline = prefs.getLong(KEY_STEP_BASELINE_SENSOR, -1L)
-            if (savedBaseline > 0L) savedBaseline + loadCurrentStepsFromDaemon() else -1L
+            val isSet = prefs.getBoolean(KEY_STEP_BASELINE_SET, false)
+            if (isSet) {
+                prefs.getLong(KEY_STEP_BASELINE_SENSOR, 0L) + loadCurrentStepsFromDaemon()
+            } else -1L
         }
 
         if (sensorTotal > 0L) {
-            val newBaseline = (sensorTotal - newCurrentSteps).coerceAtLeast(0L)
+            // Note: newBaseline can be negative if newCurrentSteps > sensorTotal!
+            val newBaseline = (sensorTotal - newCurrentSteps)
             saveBaseline(newBaseline, today)
         } else {
-            baselineSensorValue = -1L
             activeBaselineDate = today
-            prefs.edit()
-                .putString(KEY_STEP_BASELINE_DATE, today)
-                .apply()
+            val newBaseline = -newCurrentSteps.toLong()
+            saveBaseline(newBaseline, today)
         }
         setStepDaemons(newCurrentSteps)
     }
@@ -161,16 +204,16 @@ class StepSensorManager(private val context: Context) : SensorEventListener {
                 }
 
                 // 2. First sensor event today (no baseline yet saved)
-                if (baselineSensorValue < 0L) {
+                if (!isBaselineInitialized) {
                     val savedStepsToday = loadCurrentStepsFromDaemon()
-                    val newBaseline = (totalSinceBoot - savedStepsToday).coerceAtLeast(0L)
+                    val newBaseline = totalSinceBoot - savedStepsToday
                     Log.d(TAG, "Initializing baseline today: totalSinceBoot=$totalSinceBoot, savedStepsToday=$savedStepsToday, baseline=$newBaseline")
                     saveBaseline(newBaseline, today)
-                } else if (totalSinceBoot < baselineSensorValue) {
+                } else if (lastKnownSensorTotal > 0L && totalSinceBoot < lastKnownSensorTotal - 100L) {
                     // 3. Device reboot detected during today (hardware counter restarted from 0)
                     val savedStepsToday = loadCurrentStepsFromDaemon()
-                    val recoveredBaseline = (totalSinceBoot - savedStepsToday).coerceAtLeast(0L)
-                    Log.d(TAG, "Device reboot detected: totalSinceBoot=$totalSinceBoot < baseline=$baselineSensorValue. Recovering baseline to $recoveredBaseline")
+                    val recoveredBaseline = totalSinceBoot - savedStepsToday
+                    Log.d(TAG, "Device reboot detected: totalSinceBoot=$totalSinceBoot < lastKnown=$lastKnownSensorTotal. Recovering baseline to $recoveredBaseline")
                     saveBaseline(recoveredBaseline, today)
                 }
 
@@ -217,7 +260,9 @@ class StepSensorManager(private val context: Context) : SensorEventListener {
         }
         if (modified) {
             prefManager.saveDaemons(daemons)
-            onStepsUpdated?.invoke(stepsToday)
+            listeners.forEach { listener ->
+                try { listener(stepsToday) } catch (_: Exception) {}
+            }
         }
     }
 
@@ -236,7 +281,9 @@ class StepSensorManager(private val context: Context) : SensorEventListener {
         }
         if (modified) {
             prefManager.saveDaemons(daemons)
-            onStepsUpdated?.invoke(updatedVal)
+            listeners.forEach { listener ->
+                try { listener(updatedVal) } catch (_: Exception) {}
+            }
         }
     }
 

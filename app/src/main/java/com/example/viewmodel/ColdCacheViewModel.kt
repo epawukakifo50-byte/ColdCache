@@ -261,7 +261,7 @@ class ColdCacheViewModel(
         com.example.util.AppHaptics.tick(appContext, _systemConfig.value.hapticFeedbackEnabled)
     }
 
-    private val stepSensorManager = com.example.sensor.StepSensorManager(appContext).apply {
+    private val stepSensorManager = com.example.sensor.StepSensorManager.getInstance(appContext).apply {
         onStepsUpdated = {
             _daemons.value = OrderedDaemonMap(prefManager.loadDaemons())
             syncExternalViews()
