@@ -91,6 +91,31 @@ object UpdateChecker {
         return false
     }
 
+    fun downloadUpdate(context: Context, url: String, fileName: String = "ColdCache-Update.apk") {
+        try {
+            val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as? android.app.DownloadManager
+            if (dm != null && url.startsWith("http")) {
+                val request = android.app.DownloadManager.Request(Uri.parse(url)).apply {
+                    setTitle(fileName)
+                    setDescription("Загрузка обновления ColdCache...")
+                    setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                    setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_DOWNLOADS, fileName)
+                    setMimeType("application/vnd.android.package-archive")
+                }
+                dm.enqueue(request)
+                android.widget.Toast.makeText(
+                    context,
+                    "Загрузка началась. Проверьте шторку уведомлений!",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+                return
+            }
+        } catch (_: Exception) {}
+
+        // Fallback to browser
+        openDownload(context, url)
+    }
+
     fun openDownload(context: Context, url: String) {
         try {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {

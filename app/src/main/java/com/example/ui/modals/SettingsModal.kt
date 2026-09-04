@@ -2592,9 +2592,10 @@ private fun SystemInfoAndUpdatesSection(
                                         .clip(shapes.secondary)
                                         .background(colors.accent1)
                                         .clickable {
-                                            com.example.util.UpdateChecker.openDownload(
+                                            com.example.util.UpdateChecker.downloadUpdate(
                                                 context,
-                                                availableUpdate.apkDownloadUrl ?: availableUpdate.releasePageUrl
+                                                availableUpdate.apkDownloadUrl ?: availableUpdate.releasePageUrl,
+                                                "ColdCache-${availableUpdate.latestVersion}.apk"
                                             )
                                         }
                                         .padding(horizontal = 10.dp, vertical = 5.dp)

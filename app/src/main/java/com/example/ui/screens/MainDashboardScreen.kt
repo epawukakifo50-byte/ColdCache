@@ -173,9 +173,10 @@ fun MainDashboardScreen(
                                         .clip(shapes.secondary)
                                         .background(colors.accent1)
                                         .clickable {
-                                            com.example.util.UpdateChecker.openDownload(
+                                            com.example.util.UpdateChecker.downloadUpdate(
                                                 context,
-                                                update.apkDownloadUrl ?: update.releasePageUrl
+                                                update.apkDownloadUrl ?: update.releasePageUrl,
+                                                "ColdCache-${update.latestVersion}.apk"
                                             )
                                         }
                                         .padding(horizontal = 12.dp, vertical = 6.dp)

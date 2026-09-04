@@ -17,22 +17,15 @@ android {
     applicationId = "com.aistudio.coldcache.xtrz"
     minSdk = 26
     targetSdk = 36
-    versionCode = 233
-    versionName = "2.3.3"
+    versionCode = 234
+    versionName = "2.3.4"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
   signingConfigs {
-    create("release") {
-      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
-      storeFile = file(keystorePath)
-      storePassword = System.getenv("STORE_PASSWORD")
-      keyAlias = "upload"
-      keyPassword = System.getenv("KEY_PASSWORD")
-    }
-    create("debugConfig") {
-      storeFile = file("${rootDir}/debug.keystore")
+    create("appKey") {
+      storeFile = file("${rootDir}/keystore/debug.keystore")
       storePassword = "android"
       keyAlias = "androiddebugkey"
       keyPassword = "android"
@@ -44,10 +37,11 @@ android {
       isCrunchPngs = false
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      signingConfig = signingConfigs.getByName("release")
+      signingConfig = signingConfigs.getByName("appKey")
     }
     debug {
       isDebuggable = true
+      signingConfig = signingConfigs.getByName("appKey")
     }
   }
   compileOptions {

@@ -13,7 +13,7 @@ app/build/
 .cxx
 *.apk
 *.aab
-.env
-debug.keystore
+/debug.keystore
+!keystore/debug.keystore
 gradle/wrapper/*.zip
 gradle/gradle-*/
