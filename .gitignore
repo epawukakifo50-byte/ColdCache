@@ -15,3 +15,5 @@ app/build/
 *.aab
 .env
 debug.keystore
+gradle/wrapper/*.zip
+gradle/gradle-*/
