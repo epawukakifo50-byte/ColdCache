@@ -83,19 +83,6 @@ class PreferenceManager(context: Context) {
     fun loadDaemons(): Map<String, Daemon> {
         val savedArrayJson = prefs.getString("cc_daemons_array", null)
         val savedObjectJson = prefs.getString("cc_daemons", null)
-        val lastDate = prefs.getString("cc_date", null)
-        val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-
-        val isNewDay = lastDate != null && lastDate != today
-        prefs.edit().putString("cc_date", today).apply()
-
-        // Reset step counter baseline on new day so StepSensorManager starts fresh from 0
-        if (isNewDay) {
-            prefs.edit()
-                .remove("cc_step_baseline_sensor")
-                .remove("cc_step_baseline_date")
-                .apply()
-        }
 
         val result = linkedMapOf<String, Daemon>()
 
@@ -112,7 +99,7 @@ class PreferenceManager(context: Context) {
                     val typeName = obj.optString("type", DaemonType.MANUAL.name)
                     val type = try { DaemonType.valueOf(typeName) } catch (_: Exception) { DaemonType.MANUAL }
                     val colorHex = if (obj.has("colorHex") && !obj.isNull("colorHex")) obj.getString("colorHex") else null
-                    val current = if (isNewDay) 0 else obj.optInt("current", 0)
+                    val current = obj.optInt("current", 0)
                     result[key] = Daemon(key, label, current, max, step, iconName, type, colorHex)
                 }
             } catch (_: Exception) {}
@@ -130,7 +117,7 @@ class PreferenceManager(context: Context) {
                     val typeName = obj.optString("type", DaemonType.MANUAL.name)
                     val type = try { DaemonType.valueOf(typeName) } catch (_: Exception) { DaemonType.MANUAL }
                     val colorHex = if (obj.has("colorHex") && !obj.isNull("colorHex")) obj.getString("colorHex") else null
-                    val current = if (isNewDay) 0 else obj.optInt("current", 0)
+                    val current = obj.optInt("current", 0)
                     result[key] = Daemon(key, label, current, max, step, iconName, type, colorHex)
                 }
             } catch (_: Exception) {}
@@ -138,7 +125,7 @@ class PreferenceManager(context: Context) {
 
         val finalDaemons = if (result.isEmpty()) DEFAULT_DAEMONS else result
 
-        if (isNewDay || savedArrayJson.isNullOrEmpty()) {
+        if (savedArrayJson.isNullOrEmpty()) {
             saveDaemons(finalDaemons)
         }
 
@@ -146,8 +133,12 @@ class PreferenceManager(context: Context) {
     }
 
     fun recordDaemonProgress(key: String, current: Int, max: Int) {
+        val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        recordDaemonProgressForDate(key, today, current, max)
+    }
+
+    fun recordDaemonProgressForDate(key: String, date: String, current: Int, max: Int) {
         try {
-            val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
             val historyKey = "cc_daemon_hist_$key"
             val existingJson = prefs.getString(historyKey, "{}") ?: "{}"
             val root = JSONObject(existingJson)
@@ -155,7 +146,7 @@ class PreferenceManager(context: Context) {
                 put("current", current)
                 put("max", max)
             }
-            root.put(today, dayObj)
+            root.put(date, dayObj)
             prefs.edit().putString(historyKey, root.toString()).apply()
         } catch (_: Exception) {}
     }
@@ -207,15 +198,58 @@ class PreferenceManager(context: Context) {
         } catch (_: Exception) {}
     }
 
+    /**
+     * Atomically checks if calendar day has changed.
+     * ONLY resets daemon counters if the stored active date is different from today.
+     * Returns true if a daily reset was performed, false otherwise.
+     */
+    @Synchronized
+    fun checkAndPerformDailyRollover(): Boolean {
+        val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        val lastDate = prefs.getString("cc_last_active_date", null) ?: prefs.getString("cc_date", null)
+
+        if (lastDate == null) {
+            // First run after install: record today as active date without wiping
+            prefs.edit()
+                .putString("cc_last_active_date", today)
+                .putString("cc_date", today)
+                .apply()
+            return false
+        }
+
+        if (lastDate == today) {
+            // Same day: NEVER reset during the day!
+            return false
+        }
+
+        // It is strictly a NEW DAY!
+        val currentDaemons = loadDaemons()
+        // 1. Preserve yesterday's final values in history
+        currentDaemons.forEach { (key, daemon) ->
+            recordDaemonProgressForDate(key, lastDate, daemon.current, daemon.max)
+        }
+
+        // 2. Reset daemon counters to 0 for today
+        val resetDaemons = currentDaemons.mapValues { (_, d) -> d.copy(current = 0) }
+        saveDaemons(resetDaemons)
+
+        // 3. Update active date to today
+        prefs.edit()
+            .putString("cc_last_active_date", today)
+            .putString("cc_date", today)
+            .apply()
+
+        return true
+    }
+
     fun resetDailyDaemons(): Map<String, Daemon> {
         val currentDaemons = loadDaemons()
         val reset = currentDaemons.mapValues { (_, d) -> d.copy(current = 0) }
         saveDaemons(reset)
         val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
         prefs.edit()
+            .putString("cc_last_active_date", today)
             .putString("cc_date", today)
-            .remove("cc_step_baseline_sensor")
-            .putString("cc_step_baseline_date", today)
             .apply()
         return reset
     }

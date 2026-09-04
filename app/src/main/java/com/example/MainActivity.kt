@@ -82,6 +82,9 @@ class MainActivity : ComponentActivity() {
                 if (results[Manifest.permission.POST_NOTIFICATIONS] == true && systemConfig.daemonShadeTracker) {
                     com.example.service.NotificationHelper.showOrUpdateDaemonNotification(applicationContext)
                 }
+                if (results[Manifest.permission.ACTIVITY_RECOGNITION] == true) {
+                    viewModel.restartStepSensor()
+                }
             }
 
             LaunchedEffect(Unit) {
@@ -219,6 +222,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         viewModel.checkDailyRollover()
+        viewModel.restartStepSensor()
         viewModel.refreshFromExternalSources()
         val prefManager = PreferenceManager(applicationContext)
         val config = prefManager.loadSystemConfig()

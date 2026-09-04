@@ -26,6 +26,7 @@ import kotlinx.coroutines.launch
 class DaemonTrackerService : Service() {
 
     private val serviceScope = CoroutineScope(Dispatchers.IO + Job())
+    private var stepSensorManager: com.example.sensor.StepSensorManager? = null
 
     companion object {
         const val ACTION_START_TRACKER = "com.example.coldcache.START_TRACKER"
@@ -65,6 +66,18 @@ class DaemonTrackerService : Service() {
     override fun onCreate() {
         super.onCreate()
         NotificationHelper.createNotificationChannels(this)
+        stepSensorManager = com.example.sensor.StepSensorManager(applicationContext).apply {
+            onStepsUpdated = {
+                val prefManager = PreferenceManager(applicationContext)
+                updateNotification(applicationContext, prefManager.loadDaemons())
+            }
+            startListening()
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        stepSensorManager?.stopListening()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

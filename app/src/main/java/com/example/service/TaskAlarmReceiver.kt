@@ -69,14 +69,17 @@ class TaskAlarmReceiver : BroadcastReceiver() {
             Intent.ACTION_TIMEZONE_CHANGED -> {
                 CoroutineScope(Dispatchers.IO).launch {
                     val prefManager = com.example.data.local.PreferenceManager(appContext)
-                    val resetDaemons = prefManager.resetDailyDaemons()
+                    val didReset = prefManager.checkAndPerformDailyRollover()
                     
                     // Reschedule next midnight alarm
                     TaskScheduler.scheduleMidnightResetAlarm(appContext)
 
-                    // Update widget and tray
-                    com.example.widget.ColdCacheWidgetProvider.updateAllWidgets(appContext)
-                    DaemonTrackerService.updateNotification(appContext, resetDaemons)
+                    if (didReset) {
+                        val resetDaemons = prefManager.loadDaemons()
+                        // Update widget and tray
+                        com.example.widget.ColdCacheWidgetProvider.updateAllWidgets(appContext)
+                        DaemonTrackerService.updateNotification(appContext, resetDaemons)
+                    }
                 }
             }
 

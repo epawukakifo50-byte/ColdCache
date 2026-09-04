@@ -175,12 +175,15 @@ object TaskScheduler {
      */
     fun scheduleMidnightResetAlarm(context: Context) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val now = System.currentTimeMillis()
         val calendar = Calendar.getInstance().apply {
-            add(Calendar.DAY_OF_YEAR, 1)
             set(Calendar.HOUR_OF_DAY, 0)
             set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 1)
+            set(Calendar.SECOND, 2)
             set(Calendar.MILLISECOND, 0)
+        }
+        if (calendar.timeInMillis <= now) {
+            calendar.add(Calendar.DAY_OF_YEAR, 1)
         }
 
         val intent = Intent(context, TaskAlarmReceiver::class.java).apply {

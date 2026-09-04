@@ -270,14 +270,16 @@ class ColdCacheViewModel(
     }
 
     fun checkDailyRollover() {
-        val lastDate = prefManager.prefs.getString("cc_date", null)
-        val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-        if (lastDate != null && lastDate != today) {
-            val resetDaemons = prefManager.resetDailyDaemons()
-            _daemons.value = OrderedDaemonMap(resetDaemons)
+        val didReset = prefManager.checkAndPerformDailyRollover()
+        if (didReset) {
+            _daemons.value = OrderedDaemonMap(prefManager.loadDaemons())
             stepSensorManager.resetBaseline(0)
             syncExternalViews()
         }
+    }
+
+    fun restartStepSensor() {
+        stepSensorManager.restartListening()
     }
 
     fun addCustomDaemon(label: String, max: Int, step: Int, iconName: String, type: DaemonType = DaemonType.MANUAL, colorHex: String? = null) {

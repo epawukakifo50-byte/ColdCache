@@ -60,24 +60,35 @@ class StepSensorManager(private val context: Context) : SensorEventListener {
 
     fun startListening() {
         restoreBaseline()
-        when {
-            stepCounterSensor != null -> {
-                Log.d(TAG, "Using TYPE_STEP_COUNTER (baseline strategy)")
-                sensorManager?.registerListener(this, stepCounterSensor, SensorManager.SENSOR_DELAY_NORMAL)
+        var registered = false
+
+        if (stepCounterSensor != null) {
+            registered = sensorManager?.registerListener(this, stepCounterSensor, SensorManager.SENSOR_DELAY_UI) == true
+            if (registered) {
+                Log.d(TAG, "Successfully registered TYPE_STEP_COUNTER")
             }
-            stepDetectorSensor != null -> {
-                Log.d(TAG, "Using TYPE_STEP_DETECTOR (pulse strategy)")
-                sensorManager?.registerListener(this, stepDetectorSensor, SensorManager.SENSOR_DELAY_UI)
+        }
+        if (!registered && stepDetectorSensor != null) {
+            registered = sensorManager?.registerListener(this, stepDetectorSensor, SensorManager.SENSOR_DELAY_UI) == true
+            if (registered) {
+                Log.d(TAG, "Successfully registered TYPE_STEP_DETECTOR")
             }
-            accelSensor != null -> {
-                Log.d(TAG, "Using TYPE_ACCELEROMETER (fallback)")
-                sensorManager?.registerListener(this, accelSensor, SensorManager.SENSOR_DELAY_NORMAL)
+        }
+        if (!registered && accelSensor != null) {
+            registered = sensorManager?.registerListener(this, accelSensor, SensorManager.SENSOR_DELAY_UI) == true
+            if (registered) {
+                Log.d(TAG, "Successfully registered TYPE_ACCELEROMETER fallback")
             }
         }
     }
 
     fun stopListening() {
         sensorManager?.unregisterListener(this)
+    }
+
+    fun restartListening() {
+        stopListening()
+        startListening()
     }
 
     /** Restore saved baseline from SharedPreferences */
@@ -110,14 +121,20 @@ class StepSensorManager(private val context: Context) : SensorEventListener {
     /** Reset step baseline when user manually clears/edits steps or on explicit daily reset */
     fun resetBaseline(newCurrentSteps: Int = 0) {
         val today = todayString()
-        if (lastKnownSensorTotal > 0L) {
-            val newBaseline = (lastKnownSensorTotal - newCurrentSteps).coerceAtLeast(0L)
+        val sensorTotal = if (lastKnownSensorTotal > 0L) {
+            lastKnownSensorTotal
+        } else {
+            val savedBaseline = prefs.getLong(KEY_STEP_BASELINE_SENSOR, -1L)
+            if (savedBaseline > 0L) savedBaseline + loadCurrentStepsFromDaemon() else -1L
+        }
+
+        if (sensorTotal > 0L) {
+            val newBaseline = (sensorTotal - newCurrentSteps).coerceAtLeast(0L)
             saveBaseline(newBaseline, today)
         } else {
             baselineSensorValue = -1L
             activeBaselineDate = today
             prefs.edit()
-                .remove(KEY_STEP_BASELINE_SENSOR)
                 .putString(KEY_STEP_BASELINE_DATE, today)
                 .apply()
         }
@@ -135,18 +152,22 @@ class StepSensorManager(private val context: Context) : SensorEventListener {
                 lastKnownSensorTotal = totalSinceBoot
                 val today = todayString()
 
-                // 1. Check for midnight day rollover in memory while app/service is running
-                if (activeBaselineDate != today || baselineSensorValue < 0L) {
-                    // New day! Baseline for today is exactly current totalSinceBoot -> Today's steps = 0
+                // 1. Midnight rollover while running
+                if (activeBaselineDate != today) {
                     Log.d(TAG, "Midnight / New Day rollover: totalSinceBoot=$totalSinceBoot, previousDate=$activeBaselineDate, today=$today")
                     saveBaseline(totalSinceBoot, today)
                     setStepDaemons(0)
-                    prefManager.resetDailyDaemons()
                     return
                 }
 
-                // 2. Check for device reboot during today
-                if (totalSinceBoot < baselineSensorValue) {
+                // 2. First sensor event today (no baseline yet saved)
+                if (baselineSensorValue < 0L) {
+                    val savedStepsToday = loadCurrentStepsFromDaemon()
+                    val newBaseline = (totalSinceBoot - savedStepsToday).coerceAtLeast(0L)
+                    Log.d(TAG, "Initializing baseline today: totalSinceBoot=$totalSinceBoot, savedStepsToday=$savedStepsToday, baseline=$newBaseline")
+                    saveBaseline(newBaseline, today)
+                } else if (totalSinceBoot < baselineSensorValue) {
+                    // 3. Device reboot detected during today (hardware counter restarted from 0)
                     val savedStepsToday = loadCurrentStepsFromDaemon()
                     val recoveredBaseline = (totalSinceBoot - savedStepsToday).coerceAtLeast(0L)
                     Log.d(TAG, "Device reboot detected: totalSinceBoot=$totalSinceBoot < baseline=$baselineSensorValue. Recovering baseline to $recoveredBaseline")
