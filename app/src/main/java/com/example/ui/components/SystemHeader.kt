@@ -38,6 +38,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.Daemon
 import com.example.model.getDaemonColor
+import com.example.tour.TourTargetId
+import com.example.tour.tourTarget
 import com.example.ui.theme.LocalColdCacheColors
 import com.example.ui.theme.LocalColdCacheShapes
 import com.example.ui.theme.cyberGlow
@@ -53,21 +55,25 @@ fun SystemHeader(
     onSettingsClick: () -> Unit,
     onSafeModeClick: () -> Unit,
     onDaemonClick: (String) -> Unit,
-    onDaemonLongClick: (Daemon) -> Unit = {}
+    onDaemonLongClick: (Daemon) -> Unit = {},
+    modifier: Modifier = Modifier
 ) {
     val colors = LocalColdCacheColors.current
     val shapes = LocalColdCacheShapes.current
     val context = androidx.compose.ui.platform.LocalContext.current
+    val tourController = com.example.tour.LocalTourController.current
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .background(colors.bgHeader)
             .padding(horizontal = 14.dp, vertical = 12.dp)
     ) {
         // --- Top Bar ---
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .tourTarget(com.example.tour.TourTargetId.SYSTEM_HEADER, tourController),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -220,33 +226,38 @@ fun SystemHeader(
 
         // --- Daemons Cards Grid ---
         val daemonList = daemons.values.toList()
-        if (daemonList.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .clip(shapes.primary)
-                    .background(colors.bgPanel)
-                    .border(0.5.dp, colors.borderStrong.copy(alpha = 0.35f), shapes.primary)
-                    .clickable { onSettingsClick() },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "[ + НАСТРОИТЬ ДЕМОНОВ В SETTINGS ]",
-                    color = colors.accent1,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
-                )
-            }
-        } else {
-            val isScrollable = daemonList.size > 3
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .then(if (isScrollable) Modifier.horizontalScroll(rememberScrollState()) else Modifier),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .tourTarget(com.example.tour.TourTargetId.MODULAR_DAEMONS, tourController)
+        ) {
+            if (daemonList.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .clip(shapes.primary)
+                        .background(colors.bgPanel)
+                        .border(0.5.dp, colors.borderStrong.copy(alpha = 0.35f), shapes.primary)
+                        .clickable { onSettingsClick() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "[ + НАСТРОИТЬ ДЕМОНОВ В SETTINGS ]",
+                        color = colors.accent1,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            } else {
+                val isScrollable = daemonList.size > 3
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .then(if (isScrollable) Modifier.horizontalScroll(rememberScrollState()) else Modifier),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                 daemonList.forEach { daemon ->
                     val key = daemon.key
                     val dColor = getDaemonColor(key, colors.isDark, daemon.colorHex)
@@ -333,4 +344,5 @@ fun SystemHeader(
             }
         }
     }
+}
 }

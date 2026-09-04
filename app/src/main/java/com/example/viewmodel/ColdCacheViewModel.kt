@@ -175,6 +175,25 @@ class ColdCacheViewModel(
                 exportMemoryDumpJson()
             }
         }
+
+        // Automatic first-run interactive tour check
+        viewModelScope.launch {
+            delay(600)
+            if (!prefManager.hasCompletedTour() && _systemState.value == AppSystemState.NORMAL) {
+                tourController.startTour(com.example.tour.TourScenarios.DASHBOARD_CORE)
+            }
+        }
+    }
+
+    val tourController = com.example.tour.TourController(
+        onTourFinished = {
+            prefManager.setTourCompleted(true)
+        }
+    )
+
+    fun startInteractiveTour() {
+        prefManager.setTourCompleted(false)
+        tourController.startTour(com.example.tour.TourScenarios.DASHBOARD_CORE)
     }
 
     fun refreshFromExternalSources() {
@@ -233,6 +252,11 @@ class ColdCacheViewModel(
         currentDaemons[key] = d.copy(current = newCurrent)
         _daemons.value = OrderedDaemonMap(currentDaemons)
         prefManager.saveDaemons(currentDaemons)
+
+        if (d.type == DaemonType.SENSOR_STEPS) {
+            stepSensorManager.resetBaseline(newCurrent)
+        }
+
         syncExternalViews()
         com.example.util.AppHaptics.tick(appContext, _systemConfig.value.hapticFeedbackEnabled)
     }
@@ -243,6 +267,17 @@ class ColdCacheViewModel(
             syncExternalViews()
         }
         startListening()
+    }
+
+    fun checkDailyRollover() {
+        val lastDate = prefManager.prefs.getString("cc_date", null)
+        val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        if (lastDate != null && lastDate != today) {
+            val resetDaemons = prefManager.resetDailyDaemons()
+            _daemons.value = OrderedDaemonMap(resetDaemons)
+            stepSensorManager.resetBaseline(0)
+            syncExternalViews()
+        }
     }
 
     fun addCustomDaemon(label: String, max: Int, step: Int, iconName: String, type: DaemonType = DaemonType.MANUAL, colorHex: String? = null) {

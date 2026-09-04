@@ -44,6 +44,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.tour.TourTargetId
+import com.example.tour.tourTarget
 import com.example.ui.theme.LocalColdCacheColors
 import com.example.ui.theme.LocalColdCacheShapes
 import com.example.ui.theme.cyberGlow
@@ -265,11 +267,13 @@ fun DevNullConsole(
         }
 
         // === 3. Pinned Bottom DevNull Input Bar ===
+        val tourController = com.example.tour.LocalTourController.current
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .imePadding()
                 .padding(14.dp)
+                .tourTarget(TourTargetId.DEV_NULL, tourController)
                 .then(
                     if (isOverlayActive) {
                         Modifier.cyberGlow(colors.accent1, (colors.glowLevel * 0.6f).toInt(), radius = 8.dp)

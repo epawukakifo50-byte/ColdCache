@@ -129,74 +129,86 @@ class MainActivity : ComponentActivity() {
             }
 
             ColdCacheTheme(config = systemConfig) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .safeDrawingPadding()
+                androidx.compose.runtime.CompositionLocalProvider(
+                    com.example.tour.LocalTourController provides viewModel.tourController
                 ) {
-                    when {
-                        systemState == AppSystemState.SAFE_MODE -> {
-                            SafeModeScreen(
-                                terminology = systemConfig.terminology,
-                                onWakeUp = { viewModel.setSystemState(AppSystemState.NORMAL) }
-                            )
-                        }
-                        systemState == AppSystemState.COMPILING && activeColliderTask != null -> {
-                            val currentTask = activeColliderTask!!
-                            CompilingScreen(
-                                task = currentTask,
-                                terminology = systemConfig.terminology,
-                                initialFocusSeconds = viewModel.getTaskFocusSeconds(currentTask.id),
-                                onSaveFocusSeconds = { sec -> viewModel.saveTaskFocusSeconds(currentTask.id, sec) },
-                                onUpdateProgress = { viewModel.updateProgress(it) },
-                                onToggleSubtask = { viewModel.toggleSubtask(it) },
-                                onAddSubtask = { viewModel.addSubtask(it) },
-                                onDeleteSubtask = { viewModel.deleteSubtask(it) },
-                                onUpdateSubtask = { id, text -> viewModel.updateSubtask(id, text) },
-                                onReorderSubtask = { from, to -> viewModel.reorderSubtasks(from, to) },
-                                onScheduleTask = { viewModel.setSchedulingTask(currentTask) },
-                                onExit = { targetState -> viewModel.exitCompilation(targetState) },
-                                onFinish = { viewModel.finishCompilation() }
-                            )
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .safeDrawingPadding()
+                        ) {
+                            when {
+                                systemState == AppSystemState.SAFE_MODE -> {
+                                    SafeModeScreen(
+                                        terminology = systemConfig.terminology,
+                                        onWakeUp = { viewModel.setSystemState(AppSystemState.NORMAL) }
+                                    )
+                                }
+                                systemState == AppSystemState.COMPILING && activeColliderTask != null -> {
+                                    val currentTask = activeColliderTask!!
+                                    CompilingScreen(
+                                        task = currentTask,
+                                        terminology = systemConfig.terminology,
+                                        initialFocusSeconds = viewModel.getTaskFocusSeconds(currentTask.id),
+                                        onSaveFocusSeconds = { sec -> viewModel.saveTaskFocusSeconds(currentTask.id, sec) },
+                                        onUpdateProgress = { viewModel.updateProgress(it) },
+                                        onToggleSubtask = { viewModel.toggleSubtask(it) },
+                                        onAddSubtask = { viewModel.addSubtask(it) },
+                                        onDeleteSubtask = { viewModel.deleteSubtask(it) },
+                                        onUpdateSubtask = { id, text -> viewModel.updateSubtask(id, text) },
+                                        onReorderSubtask = { from, to -> viewModel.reorderSubtasks(from, to) },
+                                        onScheduleTask = { viewModel.setSchedulingTask(currentTask) },
+                                        onExit = { targetState -> viewModel.exitCompilation(targetState) },
+                                        onFinish = { viewModel.finishCompilation() }
+                                    )
 
-                            schedulingTask?.let { task ->
-                                com.example.ui.modals.ScheduleModal(
+                                    schedulingTask?.let { task ->
+                                        com.example.ui.modals.ScheduleModal(
+                                            task = task,
+                                            onSave = { id, date, time -> viewModel.updateTaskSchedule(id, date, time) },
+                                            onClose = { viewModel.setSchedulingTask(null) }
+                                        )
+                                    }
+                                }
+                                else -> {
+                                    MainDashboardScreen(
+                                        viewModel = viewModel,
+                                        config = systemConfig,
+                                        daemons = daemons,
+                                        activeRamTasks = activeRamTasks,
+                                        cryoTasks = cryoTasks,
+                                        bufferTasks = bufferTasks,
+                                        allTasks = allTasks,
+                                        renderLog = renderLog,
+                                        isBufferOpen = isBufferOpen,
+                                        isTemporalOpen = isTemporalOpen,
+                                        isLogOpen = isLogOpen,
+                                        isMatrixOpen = isMatrixOpen,
+                                        isSettingsOpen = isSettingsOpen,
+                                        isManualOpen = isManualOpen,
+                                        schedulingTask = schedulingTask,
+                                        ramOverflowTask = ramOverflowTask,
+                                        editingTaskId = editingTaskId,
+                                        isBufferReversed = isBufferReversed
+                                    )
+                                }
+                            }
+
+                            // Thermal Dissipation Cooling HUD Overlay
+                            completedDissipationTask?.let { task ->
+                                com.example.ui.components.ThermalDissipationOverlay(
                                     task = task,
-                                    onSave = { id, date, time -> viewModel.updateTaskSchedule(id, date, time) },
-                                    onClose = { viewModel.setSchedulingTask(null) }
+                                    hapticEnabled = systemConfig.hapticFeedbackEnabled,
+                                    onDismiss = { viewModel.dismissThermalDissipation() }
                                 )
                             }
                         }
-                        else -> {
-                            MainDashboardScreen(
-                                viewModel = viewModel,
-                                config = systemConfig,
-                                daemons = daemons,
-                                activeRamTasks = activeRamTasks,
-                                cryoTasks = cryoTasks,
-                                bufferTasks = bufferTasks,
-                                allTasks = allTasks,
-                                renderLog = renderLog,
-                                isBufferOpen = isBufferOpen,
-                                isTemporalOpen = isTemporalOpen,
-                                isLogOpen = isLogOpen,
-                                isMatrixOpen = isMatrixOpen,
-                                isSettingsOpen = isSettingsOpen,
-                                isManualOpen = isManualOpen,
-                                schedulingTask = schedulingTask,
-                                ramOverflowTask = ramOverflowTask,
-                                editingTaskId = editingTaskId,
-                                isBufferReversed = isBufferReversed
-                            )
-                        }
-                    }
 
-                    // Thermal Dissipation Cooling HUD Overlay
-                    completedDissipationTask?.let { task ->
-                        com.example.ui.components.ThermalDissipationOverlay(
-                            task = task,
-                            hapticEnabled = systemConfig.hapticFeedbackEnabled,
-                            onDismiss = { viewModel.dismissThermalDissipation() }
+                        // Interactive Onboarding Spotlight Tour Overlay (Full window coordinates matching boundsInRoot)
+                        com.example.tour.ui.TourSpotlightOverlay(
+                            tourController = viewModel.tourController,
+                            modifier = Modifier.fillMaxSize()
                         )
                     }
                 }
@@ -206,6 +218,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        viewModel.checkDailyRollover()
         viewModel.refreshFromExternalSources()
         val prefManager = PreferenceManager(applicationContext)
         val config = prefManager.loadSystemConfig()

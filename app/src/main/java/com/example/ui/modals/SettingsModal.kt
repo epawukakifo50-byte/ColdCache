@@ -205,7 +205,8 @@ fun SettingsModal(
                 onOpenColorPicker = { target, hex ->
                     colorPickerTarget = target
                     colorPickerHex = hex
-                }
+                },
+                onClose = onClose
             )
 
             // === SECTION 2: DAEMON_SERVICES & NOTIFICATIONS ===
@@ -313,7 +314,8 @@ fun SettingsModal(
 private fun VisualSettingsSection(
     config: SystemConfig,
     onUpdateConfig: ((SystemConfig) -> SystemConfig) -> Unit,
-    onOpenColorPicker: (String, String) -> Unit
+    onOpenColorPicker: (String, String) -> Unit,
+    onClose: () -> Unit = {}
 ) {
     val colors = LocalColdCacheColors.current
     val shapes = LocalColdCacheShapes.current
@@ -844,6 +846,41 @@ private fun VisualSettingsSection(
                         )
                     }
                 }
+            }
+        }
+
+        // Interactive Onboarding Tour Restart Button
+        val tourController = com.example.tour.LocalTourController.current
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(shapes.secondary)
+                .background(colors.bgPanel)
+                .border(0.5.dp, colors.accent1.copy(alpha = 0.5f), shapes.secondary)
+                .clickable {
+                    onClose()
+                    tourController?.startTour(com.example.tour.TourScenarios.DASHBOARD_CORE)
+                }
+                .padding(12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = null,
+                    tint = colors.accent1,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = "ПРОЙТИ ОБУЧЕНИЕ ЗАНОВО (SPOTLIGHT TOUR)",
+                    color = colors.accent1,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
             }
         }
     }

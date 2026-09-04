@@ -212,7 +212,11 @@ class PreferenceManager(context: Context) {
         val reset = currentDaemons.mapValues { (_, d) -> d.copy(current = 0) }
         saveDaemons(reset)
         val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-        prefs.edit().putString("cc_date", today).apply()
+        prefs.edit()
+            .putString("cc_date", today)
+            .remove("cc_step_baseline_sensor")
+            .putString("cc_step_baseline_date", today)
+            .apply()
         return reset
     }
 
@@ -263,5 +267,17 @@ class PreferenceManager(context: Context) {
 
     fun clearTaskFocusSeconds(taskId: String) {
         prefs.edit().remove("cc_focus_sec_$taskId").apply()
+    }
+
+    fun hasCompletedTour(): Boolean {
+        return prefs.getBoolean("cc_has_completed_tour", false)
+    }
+
+    fun setTourCompleted(completed: Boolean) {
+        prefs.edit().putBoolean("cc_has_completed_tour", completed).apply()
+    }
+
+    fun resetTourStatus() {
+        prefs.edit().putBoolean("cc_has_completed_tour", false).apply()
     }
 }

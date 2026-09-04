@@ -27,6 +27,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.*
+import com.example.tour.TourTargetId
+import com.example.tour.tourTarget
 import com.example.ui.components.*
 import com.example.ui.modals.*
 import com.example.ui.theme.LocalColdCacheColors
@@ -61,6 +63,7 @@ fun MainDashboardScreen(
     val scheduledCount = allTasks.count { !it.scheduledDate.isNullOrBlank() }
     val selectedHeatmapDaemon by viewModel.selectedHeatmapDaemon.collectAsState()
     val editingTask by viewModel.editingTask.collectAsState()
+    val tourController = com.example.tour.LocalTourController.current
 
     val modalEnter = fadeIn(tween(220)) +
             slideInVertically(
@@ -108,6 +111,7 @@ fun MainDashboardScreen(
                 Box(
                     modifier = Modifier
                         .weight(1f)
+                        .tourTarget(TourTargetId.BUFFER_BUTTON, tourController)
                         .clip(shapes.primary)
                         .background(colors.bgPanel)
                         .border(1.dp, colors.borderStrong, shapes.primary)
@@ -186,21 +190,33 @@ fun MainDashboardScreen(
             }
 
             // --- Active RAM Panel ---
-            ActiveRamPanel(
-                tasks = activeRamTasks,
-                terminology = config.terminology,
-                onStartEdit = { viewModel.startEditTask(it) },
-                onMoveToCryo = { viewModel.moveTask(it, TaskState.CRYO) },
-                onStartCompilation = { viewModel.startCompilation(it) }
-            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .tourTarget(TourTargetId.ACTIVE_RAM, tourController)
+            ) {
+                ActiveRamPanel(
+                    tasks = activeRamTasks,
+                    terminology = config.terminology,
+                    onStartEdit = { viewModel.startEditTask(it) },
+                    onMoveToCryo = { viewModel.moveTask(it, TaskState.CRYO) },
+                    onStartCompilation = { viewModel.startCompilation(it) }
+                )
+            }
 
             // --- Cryo Storage Panel ---
-            CryoStoragePanel(
-                tasks = cryoTasks,
-                terminology = config.terminology,
-                onStartEdit = { viewModel.startEditTask(it) },
-                onMoveToRam = { viewModel.moveTask(it, TaskState.ACTIVE_RAM) }
-            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .tourTarget(TourTargetId.CRYO_STORAGE, tourController)
+            ) {
+                CryoStoragePanel(
+                    tasks = cryoTasks,
+                    terminology = config.terminology,
+                    onStartEdit = { viewModel.startEditTask(it) },
+                    onMoveToRam = { viewModel.moveTask(it, TaskState.ACTIVE_RAM) }
+                )
+            }
 
             Spacer(modifier = Modifier.height(70.dp))
         }
