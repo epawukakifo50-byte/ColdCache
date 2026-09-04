@@ -10,6 +10,7 @@ import com.example.model.*
 import com.example.service.DaemonTrackerService
 import com.example.service.TaskScheduler
 import com.example.widget.ColdCacheWidgetProvider
+import com.example.util.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
@@ -119,6 +120,34 @@ class ColdCacheViewModel(
         _completedDissipationTask.value = null
     }
 
+    // --- In-App Updates ---
+    private val _availableUpdate = MutableStateFlow<AppUpdateInfo?>(null)
+    val availableUpdate: StateFlow<AppUpdateInfo?> = _availableUpdate.asStateFlow()
+
+    private val _isCheckingUpdate = MutableStateFlow(false)
+    val isCheckingUpdate: StateFlow<Boolean> = _isCheckingUpdate.asStateFlow()
+
+    fun checkForUpdates(isManual: Boolean = false, onResult: ((Boolean) -> Unit)? = null) {
+        viewModelScope.launch {
+            _isCheckingUpdate.value = true
+            val info = UpdateChecker.checkForUpdate()
+            _isCheckingUpdate.value = false
+            if (info != null && info.isUpdateAvailable) {
+                _availableUpdate.value = info
+                onResult?.invoke(true)
+            } else {
+                if (isManual) {
+                    _availableUpdate.value = null
+                }
+                onResult?.invoke(false)
+            }
+        }
+    }
+
+    fun dismissUpdate() {
+        _availableUpdate.value = null
+    }
+
     private val prefChangeListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         when (key) {
             "cc_daemons", "cc_daemons_array", "cc_date" -> {
@@ -182,6 +211,12 @@ class ColdCacheViewModel(
             if (!prefManager.hasCompletedTour() && _systemState.value == AppSystemState.NORMAL) {
                 tourController.startTour(com.example.tour.TourScenarios.DASHBOARD_CORE)
             }
+        }
+
+        // Background app update check from GitHub
+        viewModelScope.launch {
+            delay(4000)
+            checkForUpdates(isManual = false)
         }
     }
 

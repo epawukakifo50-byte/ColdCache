@@ -118,6 +118,9 @@ fun SettingsModal(
     onExportMarkdown: () -> Unit = {},
     onPerformEncryptedBackup: () -> File? = { null },
     onRestoreEncryptedBackup: (File) -> Boolean = { false },
+    availableUpdate: com.example.util.AppUpdateInfo? = null,
+    isCheckingUpdate: Boolean = false,
+    onCheckForUpdates: () -> Unit = {},
     onClose: () -> Unit
 ) {
     val colors = LocalColdCacheColors.current
@@ -240,6 +243,13 @@ fun SettingsModal(
                     availableBackups = com.example.util.EncryptedBackupManager.listBackups(context)
                     showBackupListDialog = true
                 }
+            )
+
+            // === SECTION 6: SYSTEM_INFO & GITHUB_UPDATES ===
+            SystemInfoAndUpdatesSection(
+                availableUpdate = availableUpdate,
+                isCheckingUpdate = isCheckingUpdate,
+                onCheckForUpdates = onCheckForUpdates
             )
         }
 
@@ -2468,6 +2478,169 @@ private fun BackupListRestoreDialog(
                         text = "CLOSE",
                         color = colors.textMuted,
                         fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ==========================================
+// 6. SYSTEM INFO & GITHUB RELEASES SECTION
+// ==========================================
+@Composable
+private fun SystemInfoAndUpdatesSection(
+    availableUpdate: com.example.util.AppUpdateInfo?,
+    isCheckingUpdate: Boolean,
+    onCheckForUpdates: () -> Unit
+) {
+    val colors = LocalColdCacheColors.current
+    val shapes = LocalColdCacheShapes.current
+    val context = LocalContext.current
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            text = "SYSTEM_INFO & GITHUB_RELEASES",
+            color = colors.textMuted,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace,
+            letterSpacing = 1.5.sp
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(shapes.secondary)
+                .background(colors.bgPanel)
+                .border(0.5.dp, colors.borderStrong.copy(alpha = 0.4f), shapes.secondary)
+                .padding(12.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "COLDCACHE OS",
+                            color = colors.textMain,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Text(
+                            text = "v${com.example.BuildConfig.VERSION_NAME} (Build ${com.example.BuildConfig.VERSION_CODE})",
+                            color = colors.accent1,
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .clip(shapes.secondary)
+                            .background(if (isCheckingUpdate) colors.bgButtonActive else colors.bgButton)
+                            .border(0.5.dp, colors.accent1, shapes.secondary)
+                            .clickable(enabled = !isCheckingUpdate) { onCheckForUpdates() }
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = if (isCheckingUpdate) "ПРОВЕРКА..." else "ПРОВЕРИТЬ",
+                            color = if (isCheckingUpdate) colors.textMuted else colors.accent1,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+
+                if (availableUpdate != null && availableUpdate.isUpdateAvailable) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(shapes.secondary)
+                            .background(colors.bgBase)
+                            .border(1.dp, colors.accent1, shapes.secondary)
+                            .padding(10.dp)
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                text = "⚡ НАЙДЕНО ОБНОВЛЕНИЕ: ${availableUpdate.latestVersion}",
+                                color = colors.accent1,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            if (availableUpdate.releaseNotes.isNotBlank()) {
+                                Text(
+                                    text = availableUpdate.releaseNotes,
+                                    color = colors.textMuted,
+                                    fontSize = 9.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    maxLines = 4
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(shapes.secondary)
+                                        .background(colors.accent1)
+                                        .clickable {
+                                            com.example.util.UpdateChecker.openDownload(
+                                                context,
+                                                availableUpdate.apkDownloadUrl ?: availableUpdate.releasePageUrl
+                                            )
+                                        }
+                                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                                ) {
+                                    Text(
+                                        text = "СКАЧАТЬ APK",
+                                        color = colors.bgBase,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // GitHub repo link button
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(shapes.secondary)
+                        .background(colors.bgBase)
+                        .border(0.5.dp, colors.borderStrong.copy(alpha = 0.3f), shapes.secondary)
+                        .clickable {
+                            com.example.util.UpdateChecker.openDownload(
+                                context,
+                                "https://github.com/epawukakifo50-byte/ColdCache/releases"
+                            )
+                        }
+                        .padding(10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "github.com/epawukakifo50-byte/ColdCache",
+                        color = colors.textMuted,
+                        fontSize = 9.sp,
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 1
+                    )
+                    Text(
+                        text = "RELEASES ↗",
+                        color = colors.accent1,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace
                     )
                 }

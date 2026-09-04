@@ -63,6 +63,8 @@ fun MainDashboardScreen(
     val scheduledCount = allTasks.count { !it.scheduledDate.isNullOrBlank() }
     val selectedHeatmapDaemon by viewModel.selectedHeatmapDaemon.collectAsState()
     val editingTask by viewModel.editingTask.collectAsState()
+    val availableUpdate by viewModel.availableUpdate.collectAsState()
+    val isCheckingUpdate by viewModel.isCheckingUpdate.collectAsState()
     val tourController = com.example.tour.LocalTourController.current
 
     val modalEnter = fadeIn(tween(220)) +
@@ -99,6 +101,98 @@ fun MainDashboardScreen(
                 onDaemonClick = { viewModel.interactDaemon(it) },
                 onDaemonLongClick = { viewModel.openDaemonHeatmap(it) }
             )
+
+            // --- Available App Update Banner ---
+            AnimatedVisibility(
+                visible = availableUpdate != null && availableUpdate!!.isUpdateAvailable,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                availableUpdate?.let { update ->
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 6.dp)
+                            .clip(shapes.primary)
+                            .background(colors.bgPanel)
+                            .border(1.dp, colors.accent1, shapes.primary)
+                            .padding(12.dp)
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = "⚡ ДОСТУПНО ОБНОВЛЕНИЕ",
+                                        color = colors.accent1,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                    Text(
+                                        text = update.latestVersion,
+                                        color = colors.textMain,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                                Text(
+                                    text = "✕",
+                                    color = colors.textMuted,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier
+                                        .clickable { viewModel.dismissUpdate() }
+                                        .padding(4.dp)
+                                )
+                            }
+                            if (update.releaseNotes.isNotBlank()) {
+                                Text(
+                                    text = update.releaseNotes.lines().filter { it.isNotBlank() }.take(2).joinToString("\n"),
+                                    color = colors.textMuted,
+                                    fontSize = 9.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    maxLines = 2
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(shapes.secondary)
+                                        .background(colors.accent1)
+                                        .clickable {
+                                            com.example.util.UpdateChecker.openDownload(
+                                                context,
+                                                update.apkDownloadUrl ?: update.releasePageUrl
+                                            )
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Text(
+                                        text = "СКАЧАТЬ APK",
+                                        color = colors.bgBase,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
 
             // --- Quick Nav Bar (Buffer & Temporal Flux Launchers) ---
             Row(
@@ -314,6 +408,9 @@ fun MainDashboardScreen(
                 onExportMarkdown = { viewModel.exportMarkdownJournal() },
                 onPerformEncryptedBackup = { viewModel.performManualEncryptedBackup() },
                 onRestoreEncryptedBackup = { viewModel.restoreEncryptedBackup(it) },
+                availableUpdate = availableUpdate,
+                isCheckingUpdate = isCheckingUpdate,
+                onCheckForUpdates = { viewModel.checkForUpdates(isManual = true) },
                 onClose = { viewModel.openSettings(false) }
             )
         }
