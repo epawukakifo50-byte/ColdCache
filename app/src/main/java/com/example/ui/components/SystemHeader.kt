@@ -1,12 +1,16 @@
 package com.example.ui.components
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -21,6 +25,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -63,6 +70,12 @@ fun SystemHeader(
     val context = androidx.compose.ui.platform.LocalContext.current
     val tourController = com.example.tour.LocalTourController.current
 
+    val logoRotation = remember { Animatable(0f) }
+    val logoScale = remember { Animatable(1f) }
+    val logoGlow = remember { Animatable(0f) }
+    val logoShake = remember { Animatable(0f) }
+    val coroutineScope = rememberCoroutineScope()
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -78,27 +91,91 @@ fun SystemHeader(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
+                modifier = Modifier
+                    .clip(shapes.secondary)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        com.example.util.AppHaptics.snap(context)
+                        coroutineScope.launch {
+                            // Flash glow shockwave
+                            launch {
+                                logoGlow.snapTo(1f)
+                                logoGlow.animateTo(0f, tween(550, easing = FastOutSlowInEasing))
+                            }
+                            // Scale bounce
+                            launch {
+                                logoScale.animateTo(1.4f, tween(80, easing = FastOutSlowInEasing))
+                                logoScale.animateTo(1f, spring(dampingRatio = 0.38f, stiffness = Spring.StiffnessLow))
+                            }
+                            // Cyber glitch jitter
+                            launch {
+                                logoShake.animateTo(4f, tween(20))
+                                logoShake.animateTo(-4f, tween(30))
+                                logoShake.animateTo(2f, tween(20))
+                                logoShake.animateTo(-1f, tween(20))
+                                logoShake.animateTo(0f, tween(20))
+                            }
+                            // 360 spring rotation (accumulative so repeated taps spin continuously!)
+                            logoRotation.animateTo(
+                                targetValue = logoRotation.value + 360f,
+                                animationSpec = spring(
+                                    dampingRatio = 0.45f,
+                                    stiffness = Spring.StiffnessMediumLow
+                                )
+                            )
+                        }
+                    }
+                    .padding(vertical = 4.dp, horizontal = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 val logoPainter = painterResource(com.example.R.drawable.ic_coldcache_logo)
                 Box(
-                    modifier = Modifier
-                        .size(19.dp)
-                        .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
-                        .drawWithCache {
-                            onDrawWithContent {
-                                with(logoPainter) {
-                                    draw(size)
-                                }
-                                drawRect(
-                                    brush = colors.accentBrush,
-                                    blendMode = BlendMode.SrcIn
-                                )
+                    modifier = Modifier.size(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    // Shockwave pulse behind the logo
+                    if (logoGlow.value > 0.01f) {
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp * (1f + logoGlow.value * 0.9f))
+                                .graphicsLayer(alpha = logoGlow.value * 0.75f)
+                                .clip(androidx.compose.foundation.shape.CircleShape)
+                                .background(colors.accent1)
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(19.dp)
+                            .graphicsLayer {
+                                rotationZ = logoRotation.value
+                                scaleX = logoScale.value
+                                scaleY = logoScale.value
+                                translationX = logoShake.value
+                                compositingStrategy = CompositingStrategy.Offscreen
                             }
-                        }
-                )
-                Row {
+                            .drawWithCache {
+                                onDrawWithContent {
+                                    with(logoPainter) {
+                                        draw(size)
+                                    }
+                                    drawRect(
+                                        brush = colors.accentBrush,
+                                        blendMode = BlendMode.SrcIn
+                                    )
+                                }
+                            }
+                    )
+                }
+                Row(
+                    modifier = Modifier.graphicsLayer {
+                        scaleX = 1f + (logoScale.value - 1f) * 0.25f
+                        scaleY = 1f + (logoScale.value - 1f) * 0.25f
+                        translationX = -logoShake.value * 0.5f
+                    }
+                ) {
                     Text(
                         text = "ColdCache",
                         color = colors.textMain,
