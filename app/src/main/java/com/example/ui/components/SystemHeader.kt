@@ -33,9 +33,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
@@ -45,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.Daemon
 import com.example.model.getDaemonColor
+import com.example.model.getDaemonOverColor
 import com.example.tour.TourTargetId
 import com.example.tour.tourTarget
 import com.example.ui.theme.LocalColdCacheColors
@@ -338,25 +341,74 @@ fun SystemHeader(
                 daemonList.forEach { daemon ->
                     val key = daemon.key
                     val dColor = getDaemonColor(key, colors.isDark, daemon.colorHex)
-                    val isDone = daemon.current >= daemon.max
+                    val overColor = getDaemonOverColor(key, colors.isDark, daemon.overColorHex, dColor)
+                    val ratio = if (daemon.max > 0) (daemon.current.toFloat() / daemon.max) else 0f
+                    val isCompleted = ratio >= 1.0f
+                    val isOverachieved = ratio > 1.10f
                     val isActive = daemon.current > 0
-                    val targetProgress = if (daemon.max > 0) (daemon.current.toFloat() / daemon.max).coerceIn(0f, 1f) else 0f
+                    val targetProgress = ratio.coerceIn(0f, 1f)
                     val animatedProgress by animateFloatAsState(
                         targetValue = targetProgress,
                         animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
                         label = "daemon_progress_$key"
                     )
 
+                    val glowColor = when {
+                        ratio >= 1.30f -> overColor
+                        ratio > 1.10f -> lerp(dColor, overColor, 0.5f)
+                        isActive -> dColor
+                        else -> Color.Transparent
+                    }
+                    val glowRadius = if (ratio >= 1.50f) 10.dp else 8.dp
+                    val glowFactor = when {
+                        ratio >= 1.50f -> 0.95f
+                        ratio >= 1.30f -> 0.85f
+                        ratio > 1.10f -> 0.8f
+                        else -> 0.7f
+                    }
+
+                    val cardBorderColor = when {
+                        ratio >= 1.50f -> Color.White
+                        ratio >= 1.30f -> overColor
+                        ratio > 1.10f -> lerp(dColor, overColor, 0.5f)
+                        isCompleted -> dColor.copy(alpha = 0.8f)
+                        isActive -> dColor.copy(alpha = 0.35f)
+                        else -> colors.borderStrong.copy(alpha = 0.2f)
+                    }
+                    val cardBorderWidth = when {
+                        ratio >= 1.50f -> 1.2.dp
+                        ratio >= 1.30f -> 1.dp
+                        ratio > 1.10f -> 1.dp
+                        isCompleted -> 0.8.dp
+                        else -> 0.5.dp
+                    }
+
+                    val activeColor = when {
+                        ratio >= 1.30f -> overColor
+                        ratio > 1.10f -> lerp(dColor, overColor, 0.6f)
+                        isActive || isCompleted -> dColor
+                        else -> colors.textMuted
+                    }
+
+                    val counterColor = when {
+                        ratio >= 1.30f -> overColor
+                        ratio > 1.10f -> lerp(dColor, overColor, 0.6f)
+                        isCompleted -> dColor
+                        isActive -> (if (colors.isDark) colors.textMain else dColor)
+                        else -> colors.textMuted
+                    }
+
                     Box(
                         modifier = Modifier
                             .then(if (isScrollable) Modifier.widthIn(min = 108.dp, max = 135.dp) else Modifier.weight(1f))
                             .height(54.dp)
                             .then(
-                                if (isActive) Modifier.cyberGlow(dColor, (colors.glowLevel * 0.7f).toInt(), shape = shapes.primary, radius = 8.dp)
+                                if (isActive) Modifier.cyberGlow(glowColor, (colors.glowLevel * glowFactor).toInt(), shape = shapes.primary, radius = glowRadius)
                                 else Modifier
                             )
                             .clip(shapes.primary)
                             .background(colors.bgPanel)
+                            .border(cardBorderWidth, cardBorderColor, shapes.primary)
                             .combinedClickable(
                                 onClick = {
                                     com.example.util.AppHaptics.tick(context)
@@ -369,13 +421,54 @@ fun SystemHeader(
                             )
                             .testTag("daemon_${key}_button")
                     ) {
-                        // Background fill bar with smooth animation
+                        // Background fill bar with smooth animation & overachievement visual progression
                         if (animatedProgress > 0f) {
+                            val fillModifier = when {
+                                ratio >= 1.50f -> Modifier.background(
+                                    Brush.horizontalGradient(
+                                        listOf(
+                                            overColor.copy(alpha = if (colors.isDark) 0.38f else 0.30f),
+                                            Color.White.copy(alpha = if (colors.isDark) 0.28f else 0.22f),
+                                            overColor.copy(alpha = if (colors.isDark) 0.38f else 0.30f)
+                                        )
+                                    )
+                                )
+                                ratio >= 1.30f -> Modifier.background(
+                                    Brush.horizontalGradient(
+                                        listOf(
+                                            dColor.copy(alpha = if (colors.isDark) 0.24f else 0.18f),
+                                            overColor.copy(alpha = if (colors.isDark) 0.32f else 0.25f)
+                                        )
+                                    )
+                                )
+                                ratio > 1.10f -> Modifier.background(
+                                    Brush.horizontalGradient(
+                                        listOf(
+                                            dColor.copy(alpha = if (colors.isDark) 0.22f else 0.18f),
+                                            lerp(dColor, overColor, 0.45f).copy(alpha = if (colors.isDark) 0.28f else 0.22f)
+                                        )
+                                    )
+                                )
+                                else -> Modifier.background(dColor.copy(alpha = if (colors.isDark) 0.22f else 0.18f))
+                            }
+
                             Box(
                                 modifier = Modifier
                                     .fillMaxHeight()
                                     .fillMaxWidth(animatedProgress)
-                                    .background(dColor.copy(alpha = if (colors.isDark) 0.22f else 0.18f))
+                                    .then(fillModifier)
+                            )
+                        }
+
+                        // White corner marker ONLY at 150%+
+                        if (ratio >= 1.50f) {
+                            Box(
+                                modifier = Modifier
+                                    .size(5.dp)
+                                    .align(Alignment.TopEnd)
+                                    .padding(top = 2.dp, end = 2.dp)
+                                    .clip(shapes.secondary)
+                                    .background(Color.White)
                             )
                         }
 
@@ -392,16 +485,16 @@ fun SystemHeader(
                             ) {
                                 DaemonIcon(
                                     name = daemon.iconName,
-                                    tint = if (isActive || isDone) dColor else colors.textMuted,
-                                    glowColor = if (isActive || isDone) dColor else null,
-                                    glowLevel = (colors.glowLevel * 0.8f).toInt(),
+                                    tint = activeColor,
+                                    glowColor = if (isActive) activeColor else null,
+                                    glowLevel = (colors.glowLevel * (if (isOverachieved) 0.9f else 0.8f)).toInt(),
                                     modifier = Modifier.size(13.dp)
                                 )
                                 Text(
                                     text = daemon.label,
-                                    color = if (isActive || isDone) dColor else colors.textMuted,
+                                    color = activeColor,
                                     fontSize = 9.sp,
-                                    fontWeight = if (isActive || isDone) FontWeight.Bold else FontWeight.Medium,
+                                    fontWeight = if (isActive || isCompleted) FontWeight.Bold else FontWeight.Medium,
                                     fontFamily = FontFamily.Monospace,
                                     letterSpacing = 0.5.sp,
                                     maxLines = 1,
@@ -410,10 +503,10 @@ fun SystemHeader(
                             }
                             Text(
                                 text = "${daemon.current}/${daemon.max}",
-                                color = if (isDone) dColor else if (isActive) (if (colors.isDark) colors.textMain else dColor) else colors.textMuted,
+                                color = counterColor,
                                 fontSize = 10.sp,
                                 fontFamily = FontFamily.Monospace,
-                                fontWeight = if (isActive || isDone) FontWeight.Bold else FontWeight.Medium
+                                fontWeight = if (isActive || isCompleted) FontWeight.Bold else FontWeight.Medium
                             )
                         }
                     }
