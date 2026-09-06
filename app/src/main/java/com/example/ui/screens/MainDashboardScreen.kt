@@ -362,6 +362,7 @@ fun MainDashboardScreen(
                 terminology = config.terminology,
                 onMoveTask = { id, st -> viewModel.moveTask(id, st) },
                 onAddScheduleSlot = { viewModel.addScheduleSlot(it) },
+                onUpdateScheduleSlot = { viewModel.updateScheduleSlot(it) },
                 onDeleteScheduleSlot = { viewModel.deleteScheduleSlot(it) },
                 onClose = { viewModel.openTemporal(false) }
             )
