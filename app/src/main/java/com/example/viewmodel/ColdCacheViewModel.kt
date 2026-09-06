@@ -104,6 +104,28 @@ class ColdCacheViewModel(
     private val _ramOverflowTask = MutableStateFlow<Task?>(null)
     val ramOverflowTask: StateFlow<Task?> = _ramOverflowTask.asStateFlow()
 
+    // --- Recurring Schedule Slots (Academic / Classes / Timetable) ---
+    private val _scheduleSlots = MutableStateFlow<List<ScheduleSlot>>(prefManager.loadScheduleSlots())
+    val scheduleSlots: StateFlow<List<ScheduleSlot>> = _scheduleSlots.asStateFlow()
+
+    fun addScheduleSlot(slot: ScheduleSlot) {
+        val updated = _scheduleSlots.value + slot
+        _scheduleSlots.value = updated
+        prefManager.saveScheduleSlots(updated)
+    }
+
+    fun updateScheduleSlot(slot: ScheduleSlot) {
+        val updated = _scheduleSlots.value.map { if (it.id == slot.id) slot else it }
+        _scheduleSlots.value = updated
+        prefManager.saveScheduleSlots(updated)
+    }
+
+    fun deleteScheduleSlot(slotId: String) {
+        val updated = _scheduleSlots.value.filter { it.id != slotId }
+        _scheduleSlots.value = updated
+        prefManager.saveScheduleSlots(updated)
+    }
+
     // --- In-place Editing & DevNull ---
     private val _editingTask = MutableStateFlow<Task?>(null)
     val editingTask: StateFlow<Task?> = _editingTask.asStateFlow()
@@ -283,7 +305,7 @@ class ColdCacheViewModel(
     fun interactDaemon(key: String) {
         val currentDaemons = _daemons.value.toMutableMap()
         val d = currentDaemons[key] ?: return
-        val newCurrent = if (d.current >= d.max) 0 else minOf(d.max, d.current + d.step)
+        val newCurrent = d.current + d.step
         currentDaemons[key] = d.copy(current = newCurrent)
         _daemons.value = OrderedDaemonMap(currentDaemons)
         prefManager.saveDaemons(currentDaemons)
@@ -294,6 +316,55 @@ class ColdCacheViewModel(
 
         syncExternalViews()
         com.example.util.AppHaptics.tick(appContext, _systemConfig.value.hapticFeedbackEnabled)
+    }
+
+    fun resetDaemon(key: String) {
+        val currentDaemons = _daemons.value.toMutableMap()
+        val d = currentDaemons[key] ?: return
+        currentDaemons[key] = d.copy(current = 0)
+        _daemons.value = OrderedDaemonMap(currentDaemons)
+        prefManager.saveDaemons(currentDaemons)
+
+        if (d.type == DaemonType.SENSOR_STEPS) {
+            stepSensorManager.resetBaseline(0)
+        }
+
+        syncExternalViews()
+        com.example.util.AppHaptics.click(appContext, _systemConfig.value.hapticFeedbackEnabled)
+    }
+
+    fun adjustDaemon(key: String, delta: Int) {
+        val currentDaemons = _daemons.value.toMutableMap()
+        val d = currentDaemons[key] ?: return
+        val newCurrent = (d.current + delta).coerceAtLeast(0)
+        currentDaemons[key] = d.copy(current = newCurrent)
+        _daemons.value = OrderedDaemonMap(currentDaemons)
+        prefManager.saveDaemons(currentDaemons)
+
+        if (d.type == DaemonType.SENSOR_STEPS) {
+            stepSensorManager.resetBaseline(newCurrent)
+        }
+
+        syncExternalViews()
+        com.example.util.AppHaptics.tick(appContext, _systemConfig.value.hapticFeedbackEnabled)
+    }
+
+    fun setDaemonDayProgress(key: String, dateStr: String, current: Int, max: Int) {
+        val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        prefManager.recordDaemonProgressForDate(key, dateStr, current, max)
+        if (dateStr == today) {
+            val currentDaemons = _daemons.value.toMutableMap()
+            val d = currentDaemons[key]
+            if (d != null) {
+                currentDaemons[key] = d.copy(current = current)
+                _daemons.value = OrderedDaemonMap(currentDaemons)
+                prefManager.saveDaemons(currentDaemons)
+                if (d.type == DaemonType.SENSOR_STEPS) {
+                    stepSensorManager.resetBaseline(current)
+                }
+            }
+        }
+        syncExternalViews()
     }
 
     private val stepSensorManager = com.example.sensor.StepSensorManager.getInstance(appContext).apply {

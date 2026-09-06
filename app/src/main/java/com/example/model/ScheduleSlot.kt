@@ -1,0 +1,74 @@
+﻿package com.example.model
+
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.temporal.ChronoUnit
+import java.util.UUID
+
+enum class RecurrenceType {
+    WEEKLY,          // Every week (Каждую неделю)
+    BIWEEKLY_ODD,    // Every 2 weeks (Нечетная неделя / Числитель)
+    BIWEEKLY_EVEN    // Every 2 weeks (Четная неделя / Знаменатель)
+}
+
+val SCHEDULE_COLOR_PALETTE = listOf(
+    "#06b6d4", // Electric Cyan
+    "#a855f7", // Neon Purple
+    "#acf002", // Acid Lime
+    "#f59e0b", // Warm Amber
+    "#ec4899", // Cyber Pink
+    "#3b82f6", // Quantum Blue
+    "#10b981", // Emerald Matrix
+    "#f97316"  // High-Energy Orange
+)
+
+data class ScheduleSlot(
+    val id: String = UUID.randomUUID().toString(),
+    val title: String,
+    val dayOfWeek: DayOfWeek,
+    val recurrence: RecurrenceType = RecurrenceType.WEEKLY,
+    val startTime: String,             // e.g. "09:45"
+    val endTime: String,               // e.g. "13:25"
+    val colorHex: String = "#06b6d4",
+    val startDate: String = "2026-09-01", // Reference start date (yyyy-MM-dd)
+    val untilDate: String? = null,     // Optional end date, e.g. "2026-12-31"
+    val location: String? = null       // Optional room/location, e.g. "Ауд. 402"
+) {
+    /**
+     * Checks if this recurring slot takes place on the specified [date].
+     */
+    fun occursOn(date: LocalDate): Boolean {
+        // 1. Must match day of week
+        if (date.dayOfWeek != dayOfWeek) return false
+
+        // 2. Check date bounds
+        try {
+            val start = LocalDate.parse(startDate)
+            if (date.isBefore(start)) return false
+
+            if (!untilDate.isNullOrBlank()) {
+                val until = LocalDate.parse(untilDate)
+                if (date.isAfter(until)) return false
+            }
+
+            // 3. Check recurrence
+            return when (recurrence) {
+                RecurrenceType.WEEKLY -> true
+                RecurrenceType.BIWEEKLY_ODD -> {
+                    val startMonday = start.with(DayOfWeek.MONDAY)
+                    val dateMonday = date.with(DayOfWeek.MONDAY)
+                    val weeks = ChronoUnit.WEEKS.between(startMonday, dateMonday)
+                    weeks % 2L == 0L
+                }
+                RecurrenceType.BIWEEKLY_EVEN -> {
+                    val startMonday = start.with(DayOfWeek.MONDAY)
+                    val dateMonday = date.with(DayOfWeek.MONDAY)
+                    val weeks = ChronoUnit.WEEKS.between(startMonday, dateMonday)
+                    weeks % 2L != 0L
+                }
+            }
+        } catch (_: Exception) {
+            return false
+        }
+    }
+}

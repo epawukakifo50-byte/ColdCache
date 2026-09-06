@@ -113,6 +113,7 @@ fun SettingsModal(
     onDeleteDaemon: (String) -> Unit = {},
     onMoveDaemon: (String, Int) -> Unit = { _, _ -> },
     onUpdateDaemonFull: (Daemon) -> Unit = {},
+    onResetDaemon: (String) -> Unit = {},
     onExportDump: () -> String,
     onImportDump: (String) -> Boolean,
     onExportMarkdown: () -> Unit = {},
@@ -166,9 +167,9 @@ fun SettingsModal(
                     modifier = Modifier.size(18.dp)
                 )
                 Text(
-                    text = Dict.get(config.terminology, "settings").uppercase(),
+                    text = if (config.terminology == Terminology.SYSTEM) "SYSTEM CONFIGURATION" else "ПАРАМЕТРЫ СИСТЕМЫ",
                     color = colors.textMain,
-                    fontSize = 13.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace,
                     letterSpacing = 1.sp
@@ -177,7 +178,7 @@ fun SettingsModal(
 
             Box(
                 modifier = Modifier
-                    .size(32.dp)
+                    .size(28.dp)
                     .clip(shapes.secondary)
                     .background(colors.bgButton)
                     .border(0.5.dp, colors.borderStrong.copy(alpha = 0.4f), shapes.secondary)
@@ -232,7 +233,8 @@ fun SettingsModal(
                 onAddDaemon = onAddDaemon,
                 onDeleteDaemon = onDeleteDaemon,
                 onMoveDaemon = onMoveDaemon,
-                onUpdateDaemonFull = onUpdateDaemonFull
+                onUpdateDaemonFull = onUpdateDaemonFull,
+                onResetDaemon = onResetDaemon
             )
 
             // === SECTION 5: ENCRYPTED LOCAL BACKUP ===
@@ -1260,7 +1262,8 @@ private fun ModularDaemonsSettingsSection(
     onAddDaemon: (String, Int, Int, String, com.example.model.DaemonType, String?) -> Unit,
     onDeleteDaemon: (String) -> Unit,
     onMoveDaemon: (String, Int) -> Unit,
-    onUpdateDaemonFull: (Daemon) -> Unit
+    onUpdateDaemonFull: (Daemon) -> Unit,
+    onResetDaemon: (String) -> Unit
 ) {
     val colors = LocalColdCacheColors.current
     val shapes = LocalColdCacheShapes.current
@@ -1886,6 +1889,42 @@ private fun ModularDaemonsSettingsSection(
                                     .background(colors.bgButton)
                                     .border(0.5.dp, colors.borderStrong.copy(alpha = 0.35f), shapes.secondary)
                                     .padding(horizontal = 4.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
+                    // Row 4: Current Value & Quick Reset
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "CURRENT: ${daemon.current} / ${daemon.max}",
+                            color = colors.textMuted,
+                            fontSize = 9.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+
+                        Box(
+                            modifier = Modifier
+                                .clip(shapes.secondary)
+                                .background(colors.bgButton)
+                                .border(0.5.dp, colors.accent2.copy(alpha = 0.5f), shapes.secondary)
+                                .clickable {
+                                    com.example.util.AppHaptics.tick(context)
+                                    onResetDaemon(key)
+                                    android.widget.Toast.makeText(context, "Демон ${daemon.label} сброшен в 0", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                                .padding(horizontal = 8.dp, vertical = 3.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "↺ ОБНУЛИТЬ В 0",
+                                color = colors.accent2,
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
                             )
                         }
                     }

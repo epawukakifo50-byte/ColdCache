@@ -17,8 +17,8 @@ android {
     applicationId = "com.aistudio.coldcache.xtrz"
     minSdk = 26
     targetSdk = 36
-    versionCode = 234
-    versionName = "2.3.4"
+    versionCode = 235
+    versionName = "2.3.5"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }

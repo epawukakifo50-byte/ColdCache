@@ -77,7 +77,7 @@ class DaemonActionReceiver : BroadcastReceiver() {
                 val daemons = prefManager.loadDaemons().toMutableMap()
                 val daemon = daemons[daemonKey] ?: return
 
-                val newCurrent = if (daemon.current >= daemon.max) 0 else minOf(daemon.max, daemon.current + daemon.step)
+                val newCurrent = daemon.current + daemon.step
                 daemons[daemonKey] = daemon.copy(current = newCurrent)
                 prefManager.saveDaemons(daemons)
 

@@ -314,4 +314,54 @@ class PreferenceManager(context: Context) {
     fun resetTourStatus() {
         prefs.edit().putBoolean("cc_has_completed_tour", false).apply()
     }
+
+    fun loadScheduleSlots(): List<com.example.model.ScheduleSlot> {
+        val json = prefs.getString("cc_schedule_slots", "[]") ?: "[]"
+        val list = mutableListOf<com.example.model.ScheduleSlot>()
+        try {
+            val array = org.json.JSONArray(json)
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                list.add(
+                    com.example.model.ScheduleSlot(
+                        id = obj.optString("id", java.util.UUID.randomUUID().toString()),
+                        title = obj.optString("title", "Пара"),
+                        dayOfWeek = java.time.DayOfWeek.valueOf(obj.optString("dayOfWeek", "MONDAY")),
+                        recurrence = try {
+                            com.example.model.RecurrenceType.valueOf(obj.optString("recurrence", "WEEKLY"))
+                        } catch (_: Exception) { com.example.model.RecurrenceType.WEEKLY },
+                        startTime = obj.optString("startTime", "09:45"),
+                        endTime = obj.optString("endTime", "13:25"),
+                        colorHex = obj.optString("colorHex", "#06b6d4"),
+                        startDate = obj.optString("startDate", "2026-09-01"),
+                        untilDate = obj.optString("untilDate", "").takeIf { it.isNotBlank() },
+                        location = obj.optString("location", "").takeIf { it.isNotBlank() }
+                    )
+                )
+            }
+        } catch (_: Exception) {}
+        return list
+    }
+
+    fun saveScheduleSlots(slots: List<com.example.model.ScheduleSlot>) {
+        try {
+            val array = org.json.JSONArray()
+            for (slot in slots) {
+                val obj = org.json.JSONObject().apply {
+                    put("id", slot.id)
+                    put("title", slot.title)
+                    put("dayOfWeek", slot.dayOfWeek.name)
+                    put("recurrence", slot.recurrence.name)
+                    put("startTime", slot.startTime)
+                    put("endTime", slot.endTime)
+                    put("colorHex", slot.colorHex)
+                    put("startDate", slot.startDate)
+                    put("untilDate", slot.untilDate ?: "")
+                    put("location", slot.location ?: "")
+                }
+                array.put(obj)
+            }
+            prefs.edit().putString("cc_schedule_slots", array.toString()).apply()
+        } catch (_: Exception) {}
+    }
 }

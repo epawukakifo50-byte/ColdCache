@@ -62,6 +62,7 @@ fun MainDashboardScreen(
 
     val scheduledCount = allTasks.count { !it.scheduledDate.isNullOrBlank() }
     val selectedHeatmapDaemon by viewModel.selectedHeatmapDaemon.collectAsState()
+    val scheduleSlots by viewModel.scheduleSlots.collectAsState()
     val editingTask by viewModel.editingTask.collectAsState()
     val availableUpdate by viewModel.availableUpdate.collectAsState()
     val isCheckingUpdate by viewModel.isCheckingUpdate.collectAsState()
@@ -350,8 +351,11 @@ fun MainDashboardScreen(
         ) {
             TemporalFluxModal(
                 tasks = allTasks,
+                scheduleSlots = scheduleSlots,
                 terminology = config.terminology,
                 onMoveTask = { id, st -> viewModel.moveTask(id, st) },
+                onAddScheduleSlot = { viewModel.addScheduleSlot(it) },
+                onDeleteScheduleSlot = { viewModel.deleteScheduleSlot(it) },
                 onClose = { viewModel.openTemporal(false) }
             )
         }
@@ -404,6 +408,9 @@ fun MainDashboardScreen(
                 onUpdateDaemonFull = { daemon ->
                     viewModel.updateDaemonFull(daemon)
                 },
+                onResetDaemon = { key ->
+                    viewModel.resetDaemon(key)
+                },
                 onExportDump = { viewModel.exportMemoryDumpJson() },
                 onImportDump = { viewModel.importMemoryDumpJson(it) },
                 onExportMarkdown = { viewModel.exportMarkdownJournal() },
@@ -435,6 +442,9 @@ fun MainDashboardScreen(
             selectedHeatmapDaemon?.let { daemon ->
                 com.example.ui.modals.DaemonHeatmapModal(
                     daemon = daemon,
+                    onResetToday = { viewModel.resetDaemon(daemon.key) },
+                    onAdjustToday = { delta -> viewModel.adjustDaemon(daemon.key, delta) },
+                    onSetDayProgress = { dateStr, cur, max -> viewModel.setDaemonDayProgress(daemon.key, dateStr, cur, max) },
                     onClose = { viewModel.openDaemonHeatmap(null) }
                 )
             }

@@ -1,21 +1,30 @@
 package com.example.ui.modals
 
+import android.widget.Toast
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -23,14 +32,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.model.Dict
+import com.example.model.RecurrenceType
+import com.example.model.SCHEDULE_COLOR_PALETTE
+import com.example.model.ScheduleSlot
 import com.example.model.Task
 import com.example.model.TaskState
 import com.example.model.Terminology
@@ -39,14 +54,28 @@ import com.example.ui.theme.LocalColdCacheShapes
 import com.example.ui.theme.cyberGlow
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.format.TextStyle as JavaTextStyle
 import java.util.Calendar
 import java.util.Locale
+
+private fun parseSlotColor(hex: String, fallback: Color = Color(0xFF06B6D4)): Color {
+    return try {
+        Color(android.graphics.Color.parseColor(hex))
+    } catch (_: Exception) {
+        fallback
+    }
+}
 
 @Composable
 fun TemporalFluxModal(
     tasks: List<Task>,
+    scheduleSlots: List<ScheduleSlot> = emptyList(),
     terminology: Terminology,
     onMoveTask: (String, TaskState) -> Unit,
+    onAddScheduleSlot: (ScheduleSlot) -> Unit = {},
+    onDeleteScheduleSlot: (String) -> Unit = {},
     onClose: () -> Unit
 ) {
     val colors = LocalColdCacheColors.current
@@ -56,7 +85,8 @@ fun TemporalFluxModal(
     val pagerState = rememberPagerState(pageCount = { 2 })
 
     var calendarMonth by remember { mutableStateOf(Calendar.getInstance()) }
-    var selectedDayTasks by remember { mutableStateOf<Pair<String, List<Task>>?>(null) }
+    var selectedDayDate by remember { mutableStateOf<String?>(null) }
+    var showScheduleManager by remember { mutableStateOf(false) }
 
     val isSystem = terminology == Terminology.SYSTEM
 
@@ -255,61 +285,96 @@ fun TemporalFluxModal(
                         .padding(14.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Month switcher
+                    // Month switcher & Schedule Manager Button
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(shapes.secondary)
-                                .background(colors.bgButton)
-                                .border(0.5.dp, colors.borderStrong.copy(alpha = 0.4f), shapes.secondary)
-                            .clickable {
-                                val next = calendarMonth.clone() as Calendar
-                                next.add(Calendar.MONTH, -1)
-                                calendarMonth = next
-                            },
-                            contentAlignment = Alignment.Center
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.ChevronLeft,
-                                contentDescription = "Prev",
-                                tint = colors.textMain,
-                                modifier = Modifier.size(16.dp)
+                            Box(
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .clip(shapes.secondary)
+                                    .background(colors.bgButton)
+                                    .border(0.5.dp, colors.borderStrong.copy(alpha = 0.4f), shapes.secondary)
+                                    .clickable {
+                                        val next = calendarMonth.clone() as Calendar
+                                        next.add(Calendar.MONTH, -1)
+                                        calendarMonth = next
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ChevronLeft,
+                                    contentDescription = "Prev",
+                                    tint = colors.textMain,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+
+                            Text(
+                                text = monthName,
+                                color = colors.accent2,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                letterSpacing = 1.sp
                             )
+
+                            Box(
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .clip(shapes.secondary)
+                                    .background(colors.bgButton)
+                                    .border(0.5.dp, colors.borderStrong.copy(alpha = 0.4f), shapes.secondary)
+                                    .clickable {
+                                        val next = calendarMonth.clone() as Calendar
+                                        next.add(Calendar.MONTH, 1)
+                                        calendarMonth = next
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ChevronRight,
+                                    contentDescription = "Next",
+                                    tint = colors.textMain,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
                         }
 
-                        Text(
-                            text = monthName,
-                            color = colors.accent2,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
-                            letterSpacing = 1.5.sp
-                        )
-
+                        // Schedule Manager button
                         Box(
                             modifier = Modifier
-                                .size(32.dp)
                                 .clip(shapes.secondary)
-                                .background(colors.bgButton)
-                                .border(0.5.dp, colors.borderStrong.copy(alpha = 0.4f), shapes.secondary)
-                            .clickable {
-                                val next = calendarMonth.clone() as Calendar
-                                next.add(Calendar.MONTH, 1)
-                                calendarMonth = next
-                            },
-                            contentAlignment = Alignment.Center
+                                .background(colors.bgButtonActive)
+                                .border(0.5.dp, colors.accent1.copy(alpha = 0.6f), shapes.secondary)
+                                .clickable {
+                                    com.example.util.AppHaptics.tick(context)
+                                    showScheduleManager = true
+                                }
+                                .padding(horizontal = 8.dp, vertical = 6.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.ChevronRight,
-                                contentDescription = "Next",
-                                tint = colors.textMain,
-                                modifier = Modifier.size(16.dp)
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = "🎓",
+                                    fontSize = 10.sp
+                                )
+                                Text(
+                                    text = if (scheduleSlots.isNotEmpty()) "РАСПИСАНИЕ (${scheduleSlots.size})" else "РАСПИСАНИЕ",
+                                    color = colors.accent1,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
                         }
                     }
 
@@ -351,9 +416,18 @@ fun TemporalFluxModal(
                                     val dayNum = cellIdx - firstDayOfWeek + 1
                                     if (dayNum in 1..daysInMonth) {
                                         val dayDateStr = String.format(Locale.US, "%s-%02d", yearMonthPrefix, dayNum)
+                                        val dayDate = try { LocalDate.parse(dayDateStr) } catch (_: Exception) { null }
                                         val dayTasks = tasks.filter { it.scheduledDate == dayDateStr }
+                                        val daySlots = if (dayDate != null) scheduleSlots.filter { it.occursOn(dayDate) } else emptyList()
                                         val hasTasks = dayTasks.isNotEmpty()
-                                        val dayDominantColor = if (hasTasks) getDayDominantColor(dayTasks) else colors.textMain
+                                        val hasSlots = daySlots.isNotEmpty()
+
+                                        val slotPrimaryColor = if (hasSlots) parseSlotColor(daySlots.first().colorHex) else null
+                                        val dayDominantColor = when {
+                                            hasTasks -> getDayDominantColor(dayTasks)
+                                            hasSlots -> slotPrimaryColor ?: colors.accent2
+                                            else -> colors.textMain
+                                        }
 
                                         Box(
                                             modifier = Modifier
@@ -361,17 +435,23 @@ fun TemporalFluxModal(
                                                 .height(52.dp)
                                                 .then(
                                                     if (hasTasks) Modifier.cyberGlow(dayDominantColor, (colors.glowLevel * 0.75f).toInt(), shape = shapes.secondary, radius = 6.dp)
+                                                    else if (hasSlots) Modifier.cyberGlow(slotPrimaryColor ?: colors.accent2, (colors.glowLevel * 0.45f).toInt(), shape = shapes.secondary, radius = 5.dp)
                                                     else Modifier
                                                 )
                                                 .clip(shapes.secondary)
                                                 .background(colors.bgPanel)
                                                 .border(
                                                     0.5.dp,
-                                                    if (hasTasks) dayDominantColor.copy(alpha = 0.8f) else colors.borderStrong.copy(alpha = 0.25f),
+                                                    when {
+                                                        hasTasks -> dayDominantColor.copy(alpha = 0.8f)
+                                                        hasSlots -> (slotPrimaryColor ?: colors.accent2).copy(alpha = 0.7f)
+                                                        else -> colors.borderStrong.copy(alpha = 0.25f)
+                                                    },
                                                     shapes.secondary
                                                 )
-                                                .clickable(enabled = hasTasks) {
-                                                    selectedDayTasks = Pair(dayDateStr, dayTasks)
+                                                .clickable {
+                                                    com.example.util.AppHaptics.tick(context)
+                                                    selectedDayDate = dayDateStr
                                                 }
                                                 .padding(4.dp)
                                         ) {
@@ -379,28 +459,67 @@ fun TemporalFluxModal(
                                                 modifier = Modifier.fillMaxSize(),
                                                 verticalArrangement = Arrangement.SpaceBetween
                                             ) {
+                                                // Day number
                                                 Text(
                                                     text = "$dayNum",
-                                                    color = if (hasTasks) dayDominantColor else colors.textMain,
+                                                    color = when {
+                                                        hasTasks -> dayDominantColor
+                                                        hasSlots -> slotPrimaryColor ?: colors.accent2
+                                                        else -> colors.textMain
+                                                    },
                                                     fontSize = 10.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     fontFamily = FontFamily.Monospace
                                                 )
-                                                if (hasTasks) {
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .align(Alignment.End)
-                                                            .clip(shapes.secondary)
-                                                            .background(dayDominantColor)
-                                                            .padding(horizontal = 4.dp, vertical = 1.dp)
-                                                    ) {
-                                                        Text(
-                                                            text = "${dayTasks.size}",
-                                                            color = if (dayDominantColor == Color(0xFF64748B)) Color.White else colors.bgBase,
-                                                            fontSize = 8.sp,
-                                                            fontWeight = FontWeight.Bold,
-                                                            fontFamily = FontFamily.Monospace
-                                                        )
+
+                                                // Bottom indicators: Schedule colored dots & Task badge
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.Bottom
+                                                ) {
+                                                    if (hasSlots) {
+                                                        Row(
+                                                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            daySlots.take(3).forEach { slot ->
+                                                                val c = parseSlotColor(slot.colorHex)
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .size(4.dp)
+                                                                        .clip(shapes.secondary)
+                                                                        .background(c)
+                                                                )
+                                                            }
+                                                            if (daySlots.size > 3) {
+                                                                Text(
+                                                                    text = "+",
+                                                                    color = colors.textMuted,
+                                                                    fontSize = 7.sp,
+                                                                    fontWeight = FontWeight.Bold
+                                                                )
+                                                            }
+                                                        }
+                                                    } else {
+                                                        Spacer(modifier = Modifier.width(1.dp))
+                                                    }
+
+                                                    if (hasTasks) {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .clip(shapes.secondary)
+                                                                .background(dayDominantColor)
+                                                                .padding(horizontal = 3.dp, vertical = 0.5.dp)
+                                                        ) {
+                                                            Text(
+                                                                text = "${dayTasks.size}",
+                                                                color = if (dayDominantColor == Color(0xFF64748B)) Color.White else colors.bgBase,
+                                                                fontSize = 8.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                fontFamily = FontFamily.Monospace
+                                                            )
+                                                        }
                                                     }
                                                 }
                                             }
@@ -445,130 +564,738 @@ fun TemporalFluxModal(
         }
     }
 
-    // --- Day Detail Dialog ---
-    selectedDayTasks?.let { (dateStr, dayTasks) ->
-        val dominantColor = getDayDominantColor(dayTasks)
-        Dialog(onDismissRequest = { selectedDayTasks = null }) {
+    // --- Day Detail Dialog (Schedule Slots & Tasks) ---
+    selectedDayDate?.let { dateStr ->
+        val dayDate = try { LocalDate.parse(dateStr) } catch (_: Exception) { null }
+        val daySlots = if (dayDate != null) scheduleSlots.filter { it.occursOn(dayDate) } else emptyList()
+        val dayTasks = tasks.filter { it.scheduledDate == dateStr }
+
+        val dominantColor = when {
+            dayTasks.isNotEmpty() -> getDayDominantColor(dayTasks)
+            daySlots.isNotEmpty() -> parseSlotColor(daySlots.first().colorHex)
+            else -> colors.accent2
+        }
+
+        val dayOfWeekTitle = dayDate?.let {
+            getDayOfWeekFullName(it.dayOfWeek)
+        } ?: ""
+
+        Dialog(onDismissRequest = { selectedDayDate = null }) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .cyberGlow(dominantColor, colors.glowLevel, shape = shapes.primary, radius = 12.dp)
                     .clip(shapes.primary)
                     .background(colors.bgPanel)
+                    .border(1.dp, dominantColor.copy(alpha = 0.5f), shapes.primary)
                     .padding(16.dp)
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
+                    // Header
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = dateStr,
-                            color = dominantColor,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
-                            letterSpacing = 1.sp
-                        )
+                        Column {
+                            Text(
+                                text = dateStr,
+                                color = dominantColor,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                letterSpacing = 1.sp
+                            )
+                            if (dayOfWeekTitle.isNotBlank()) {
+                                Text(
+                                    text = dayOfWeekTitle,
+                                    color = colors.textMuted,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                        }
+
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Close",
                             tint = colors.textMuted,
                             modifier = Modifier
                                 .size(16.dp)
-                                .clickable { selectedDayTasks = null }
+                                .clickable { selectedDayDate = null }
                         )
                     }
 
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 260.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                            .heightIn(max = 380.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        items(dayTasks, key = { it.id }) { task ->
-                            val taskColor = getStateColor(task.state)
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(shapes.secondary)
-                                    .background(colors.bgBase)
-                                    .border(0.5.dp, taskColor.copy(alpha = 0.35f), shapes.secondary)
-                                    .padding(10.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(
-                                        text = task.title,
-                                        color = colors.textMain,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = FontFamily.Monospace
-                                    )
-                                    Text(
-                                        text = if (isSystem) task.state.name else when(task.state) {
-                                            TaskState.ACTIVE_RAM -> "В ФОКУСЕ"
-                                            TaskState.CRYO -> "ОТЛОЖЕНО"
-                                            TaskState.BUFFER -> "ВХОДЯЩИЕ"
-                                        },
-                                        color = taskColor,
-                                        fontSize = 9.sp,
-                                        fontFamily = FontFamily.Monospace
-                                    )
-                                }
+                        // Section 1: 🎓 РАСПИСАНИЕ И ПАРЫ
+                        if (daySlots.isNotEmpty()) {
+                            item {
+                                Text(
+                                    text = "🎓 РАСПИСАНИЕ И ПАРЫ (${daySlots.size})",
+                                    color = colors.accent1,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace,
+                                    letterSpacing = 1.sp
+                                )
+                            }
 
+                            items(daySlots, key = { it.id }) { slot ->
+                                val slotColor = parseSlotColor(slot.colorHex)
                                 Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(shapes.secondary)
+                                        .background(colors.bgBase)
+                                        .border(0.5.dp, slotColor.copy(alpha = 0.45f), shapes.secondary)
+                                        .padding(10.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .weight(1f)
+                                            .width(4.dp)
+                                            .height(34.dp)
                                             .clip(shapes.secondary)
-                                            .background(colors.bgButton)
-                                            .border(0.5.dp, colors.borderStrong.copy(alpha = 0.35f), shapes.secondary)
-                                            .clickable {
-                                                onMoveTask(task.id, TaskState.ACTIVE_RAM)
-                                                selectedDayTasks = null
-                                            }
-                                            .padding(vertical = 6.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
+                                            .background(slotColor)
+                                    )
+
+                                    Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            text = if (isSystem) "TO RAM" else "В ФОКУС",
-                                            color = colors.accent1,
-                                            fontSize = 9.sp,
+                                            text = "[ ${slot.startTime} - ${slot.endTime} ]",
+                                            color = slotColor,
+                                            fontSize = 10.sp,
                                             fontWeight = FontWeight.Bold,
                                             fontFamily = FontFamily.Monospace
                                         )
+                                        Text(
+                                            text = slot.title,
+                                            color = colors.textMain,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                        if (!slot.location.isNullOrBlank()) {
+                                            Text(
+                                                text = "📍 ${slot.location}",
+                                                color = colors.textMuted,
+                                                fontSize = 9.sp,
+                                                fontFamily = FontFamily.Monospace
+                                            )
+                                        }
                                     }
 
                                     Box(
                                         modifier = Modifier
-                                            .weight(1f)
                                             .clip(shapes.secondary)
-                                            .background(colors.bgButton)
-                                            .border(0.5.dp, colors.borderStrong.copy(alpha = 0.35f), shapes.secondary)
-                                            .clickable {
-                                                onMoveTask(task.id, TaskState.CRYO)
-                                                selectedDayTasks = null
-                                            }
-                                            .padding(vertical = 6.dp),
-                                        contentAlignment = Alignment.Center
+                                            .background(slotColor.copy(alpha = 0.16f))
+                                            .border(0.5.dp, slotColor.copy(alpha = 0.4f), shapes.secondary)
+                                            .padding(horizontal = 6.dp, vertical = 3.dp)
                                     ) {
                                         Text(
-                                            text = if (isSystem) "TO CRYO" else "ОТЛОЖИТЬ",
-                                            color = colors.accent2,
-                                            fontSize = 9.sp,
+                                            text = when(slot.recurrence) {
+                                                RecurrenceType.WEEKLY -> "ЕЖЕНЕДЕЛЬНО"
+                                                RecurrenceType.BIWEEKLY_ODD -> "ЧИСЛИТЕЛЬ"
+                                                RecurrenceType.BIWEEKLY_EVEN -> "ЗНАМЕНАТЕЛЬ"
+                                            },
+                                            color = slotColor,
+                                            fontSize = 8.sp,
                                             fontWeight = FontWeight.Bold,
                                             fontFamily = FontFamily.Monospace
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Section 2: ⚡ ЗАДАЧИ
+                        if (dayTasks.isNotEmpty()) {
+                            item {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "⚡ ЗАДАЧИ НА ЭТОТ ДЕНЬ (${dayTasks.size})",
+                                    color = dominantColor,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace,
+                                    letterSpacing = 1.sp
+                                )
+                            }
+
+                            items(dayTasks, key = { it.id }) { task ->
+                                val taskColor = getStateColor(task.state)
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(shapes.secondary)
+                                        .background(colors.bgBase)
+                                        .border(0.5.dp, taskColor.copy(alpha = 0.35f), shapes.secondary)
+                                        .padding(10.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            text = task.title,
+                                            color = colors.textMain,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                        Text(
+                                            text = if (isSystem) task.state.name else when(task.state) {
+                                                TaskState.ACTIVE_RAM -> "В ФОКУСЕ"
+                                                TaskState.CRYO -> "ОТЛОЖЕНО"
+                                                TaskState.BUFFER -> "ВХОДЯЩИЕ"
+                                            },
+                                            color = taskColor,
+                                            fontSize = 9.sp,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                    }
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clip(shapes.secondary)
+                                                .background(colors.bgButton)
+                                                .border(0.5.dp, colors.borderStrong.copy(alpha = 0.35f), shapes.secondary)
+                                            .clickable {
+                                                onMoveTask(task.id, TaskState.ACTIVE_RAM)
+                                                selectedDayDate = null
+                                            }
+                                            .padding(vertical = 6.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = if (isSystem) "TO RAM" else "В ФОКУС",
+                                                color = colors.accent1,
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                fontFamily = FontFamily.Monospace
+                                            )
+                                        }
+
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clip(shapes.secondary)
+                                                .background(colors.bgButton)
+                                                .border(0.5.dp, colors.borderStrong.copy(alpha = 0.35f), shapes.secondary)
+                                            .clickable {
+                                                onMoveTask(task.id, TaskState.CRYO)
+                                                selectedDayDate = null
+                                            }
+                                            .padding(vertical = 6.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = if (isSystem) "TO CRYO" else "ОТЛОЖИТЬ",
+                                                color = colors.accent2,
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                fontFamily = FontFamily.Monospace
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Empty State for Day
+                        if (daySlots.isEmpty() && dayTasks.isEmpty()) {
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Text(
+                                            text = "НЕТ ПАР И ЗАДАЧ НА ЭТУ ДАТУ",
+                                            color = colors.textMuted,
+                                            fontSize = 10.sp,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(shapes.secondary)
+                                                .background(colors.bgButton)
+                                                .border(0.5.dp, colors.accent1.copy(alpha = 0.5f), shapes.secondary)
+                                                .clickable {
+                                                    selectedDayDate = null
+                                                    showScheduleManager = true
+                                                }
+                                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                                        ) {
+                                            Text(
+                                                text = "+ ДОБАВИТЬ ПАРУ В РАСПИСАНИЕ",
+                                                color = colors.accent1,
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                fontFamily = FontFamily.Monospace
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // --- Schedule Manager Dialog ---
+    if (showScheduleManager) {
+        var isCreatingSlot by remember { mutableStateOf(false) }
+        var newTitle by remember { mutableStateOf("") }
+        var newDayOfWeek by remember { mutableStateOf(DayOfWeek.MONDAY) }
+        var newRecurrence by remember { mutableStateOf(RecurrenceType.WEEKLY) }
+        var newStartTime by remember { mutableStateOf("09:45") }
+        var newEndTime by remember { mutableStateOf("13:25") }
+        var newLocation by remember { mutableStateOf("Ауд. 301") }
+        var newUntilDate by remember { mutableStateOf("2026-12-31") }
+        var newColorHex by remember { mutableStateOf(SCHEDULE_COLOR_PALETTE[0]) }
+
+        Dialog(onDismissRequest = { showScheduleManager = false }) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .cyberGlow(colors.accent1, colors.glowLevel, shape = shapes.primary, radius = 12.dp)
+                    .clip(shapes.primary)
+                    .background(colors.bgPanel)
+                    .border(1.dp, colors.accent1.copy(alpha = 0.5f), shapes.primary)
+                    .padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Header
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(text = "🎓", fontSize = 14.sp)
+                            Text(
+                                text = "УПРАВЛЕНИЕ РАСПИСАНИЕМ",
+                                color = colors.accent1,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                letterSpacing = 1.sp
+                            )
+                        }
+
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = colors.textMuted,
+                            modifier = Modifier
+                                .size(16.dp)
+                                .clickable { showScheduleManager = false }
+                        )
+                    }
+
+                    // Notice: Information only, isolated from tasks
+                    Text(
+                        text = "Слоты расписания отображаются исключительно в Календаре и не загромождают активные списки задач.",
+                        color = colors.textMuted,
+                        fontSize = 8.5.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+
+                    // Toggle Add Slot Form
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(shapes.secondary)
+                            .background(if (isCreatingSlot) colors.bgButton else colors.bgButtonActive)
+                            .border(0.5.dp, colors.accent1.copy(alpha = 0.6f), shapes.secondary)
+                            .clickable {
+                                com.example.util.AppHaptics.tick(context)
+                                isCreatingSlot = !isCreatingSlot
+                            }
+                            .padding(vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (isCreatingSlot) "СВЕРНУТЬ ФОРМУ" else "+ СОЗДАТЬ НОВУЮ ПАРУ / СЛОТ",
+                            color = colors.accent1,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+
+                    // Form
+                    if (isCreatingSlot) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(shapes.secondary)
+                                .background(colors.bgBase)
+                                .border(0.5.dp, colors.borderStrong.copy(alpha = 0.4f), shapes.secondary)
+                                .padding(10.dp)
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Title
+                            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text(text = "НАЗВАНИЕ ПАРЫ / ПРЕДМЕТ:", color = colors.textMuted, fontSize = 8.sp, fontFamily = FontFamily.Monospace)
+                                BasicTextField(
+                                    value = newTitle,
+                                    onValueChange = { newTitle = it },
+                                    textStyle = TextStyle(color = colors.textMain, fontFamily = FontFamily.Monospace, fontSize = 11.sp, fontWeight = FontWeight.Bold),
+                                    cursorBrush = SolidColor(colors.accent1),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(shapes.secondary)
+                                        .background(colors.bgPanel)
+                                        .border(0.5.dp, colors.accent1.copy(alpha = 0.5f), shapes.secondary)
+                                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                                )
+                            }
+
+                            // Day of Week
+                            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text(text = "ДЕНЬ НЕДЕЛИ:", color = colors.textMuted, fontSize = 8.sp, fontFamily = FontFamily.Monospace)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                ) {
+                                    DayOfWeek.values().forEach { dow ->
+                                        val isSel = newDayOfWeek == dow
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clip(shapes.secondary)
+                                                .background(if (isSel) colors.accent1.copy(alpha = 0.25f) else colors.bgPanel)
+                                                .border(0.5.dp, if (isSel) colors.accent1 else colors.borderStrong.copy(alpha = 0.3f), shapes.secondary)
+                                                .clickable {
+                                                    com.example.util.AppHaptics.tick(context)
+                                                    newDayOfWeek = dow
+                                                }
+                                                .padding(vertical = 4.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = getDayOfWeekShortName(dow),
+                                                color = if (isSel) colors.accent1 else colors.textMuted,
+                                                fontSize = 8.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                fontFamily = FontFamily.Monospace
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Recurrence Type
+                            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text(text = "ПЕРИОДИЧНОСТЬ:", color = colors.textMuted, fontSize = 8.sp, fontFamily = FontFamily.Monospace)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    listOf(
+                                        RecurrenceType.WEEKLY to "ЕЖЕНЕДЕЛЬНО",
+                                        RecurrenceType.BIWEEKLY_ODD to "ЧИСЛИТЕЛЬ",
+                                        RecurrenceType.BIWEEKLY_EVEN to "ЗНАМЕНАТЕЛЬ"
+                                    ).forEach { (rType, label) ->
+                                        val isSel = newRecurrence == rType
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clip(shapes.secondary)
+                                                .background(if (isSel) colors.accent2.copy(alpha = 0.22f) else colors.bgPanel)
+                                                .border(0.5.dp, if (isSel) colors.accent2 else colors.borderStrong.copy(alpha = 0.3f), shapes.secondary)
+                                                .clickable {
+                                                    com.example.util.AppHaptics.tick(context)
+                                                    newRecurrence = rType
+                                                }
+                                                .padding(vertical = 5.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = label,
+                                                color = if (isSel) colors.accent2 else colors.textMuted,
+                                                fontSize = 7.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                fontFamily = FontFamily.Monospace,
+                                                textAlign = TextAlign.Center
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Times: Start & End
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    Text(text = "НАЧАЛО:", color = colors.textMuted, fontSize = 8.sp, fontFamily = FontFamily.Monospace)
+                                    BasicTextField(
+                                        value = newStartTime,
+                                        onValueChange = { newStartTime = it },
+                                        textStyle = TextStyle(color = colors.textMain, fontFamily = FontFamily.Monospace, fontSize = 10.sp),
+                                        cursorBrush = SolidColor(colors.accent1),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(shapes.secondary)
+                                            .background(colors.bgPanel)
+                                            .border(0.5.dp, colors.borderStrong.copy(alpha = 0.4f), shapes.secondary)
+                                            .padding(horizontal = 6.dp, vertical = 5.dp)
+                                    )
+                                }
+
+                                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    Text(text = "КОНЕЦ:", color = colors.textMuted, fontSize = 8.sp, fontFamily = FontFamily.Monospace)
+                                    BasicTextField(
+                                        value = newEndTime,
+                                        onValueChange = { newEndTime = it },
+                                        textStyle = TextStyle(color = colors.textMain, fontFamily = FontFamily.Monospace, fontSize = 10.sp),
+                                        cursorBrush = SolidColor(colors.accent1),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(shapes.secondary)
+                                            .background(colors.bgPanel)
+                                            .border(0.5.dp, colors.borderStrong.copy(alpha = 0.4f), shapes.secondary)
+                                            .padding(horizontal = 6.dp, vertical = 5.dp)
+                                    )
+                                }
+                            }
+
+                            // Location & Until Date
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    Text(text = "АУДИТОРИЯ / МЕСТО:", color = colors.textMuted, fontSize = 8.sp, fontFamily = FontFamily.Monospace)
+                                    BasicTextField(
+                                        value = newLocation,
+                                        onValueChange = { newLocation = it },
+                                        textStyle = TextStyle(color = colors.textMain, fontFamily = FontFamily.Monospace, fontSize = 10.sp),
+                                        cursorBrush = SolidColor(colors.accent1),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(shapes.secondary)
+                                            .background(colors.bgPanel)
+                                            .border(0.5.dp, colors.borderStrong.copy(alpha = 0.4f), shapes.secondary)
+                                            .padding(horizontal = 6.dp, vertical = 5.dp)
+                                    )
+                                }
+
+                                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    Text(text = "ДЕЙСТВУЕТ ДО:", color = colors.textMuted, fontSize = 8.sp, fontFamily = FontFamily.Monospace)
+                                    BasicTextField(
+                                        value = newUntilDate,
+                                        onValueChange = { newUntilDate = it },
+                                        textStyle = TextStyle(color = colors.textMain, fontFamily = FontFamily.Monospace, fontSize = 10.sp),
+                                        cursorBrush = SolidColor(colors.accent1),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(shapes.secondary)
+                                            .background(colors.bgPanel)
+                                            .border(0.5.dp, colors.borderStrong.copy(alpha = 0.4f), shapes.secondary)
+                                            .padding(horizontal = 6.dp, vertical = 5.dp)
+                                    )
+                                }
+                            }
+
+                            // Color Palette
+                            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text(text = "ЦВЕТ МЕТКИ:", color = colors.textMuted, fontSize = 8.sp, fontFamily = FontFamily.Monospace)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                ) {
+                                    SCHEDULE_COLOR_PALETTE.forEach { hex ->
+                                        val isSel = newColorHex.equals(hex, ignoreCase = true)
+                                        val c = parseSlotColor(hex)
+                                        Box(
+                                            modifier = Modifier
+                                                .size(20.dp)
+                                                .clip(shapes.secondary)
+                                                .background(c)
+                                                .border(
+                                                    if (isSel) 1.5.dp else 0.5.dp,
+                                                    if (isSel) Color.White else colors.borderStrong.copy(alpha = 0.3f),
+                                                    shapes.secondary
+                                                )
+                                                .clickable {
+                                                    com.example.util.AppHaptics.tick(context)
+                                                    newColorHex = hex
+                                                }
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Submit Button
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(shapes.secondary)
+                                    .background(colors.accent1.copy(alpha = 0.25f))
+                                    .border(0.5.dp, colors.accent1, shapes.secondary)
+                                    .clickable {
+                                        if (newTitle.isBlank()) {
+                                            Toast.makeText(context, "Введите название пары", Toast.LENGTH_SHORT).show()
+                                            return@clickable
+                                        }
+                                        val slot = ScheduleSlot(
+                                            title = newTitle.trim(),
+                                            dayOfWeek = newDayOfWeek,
+                                            recurrence = newRecurrence,
+                                            startTime = newStartTime.trim(),
+                                            endTime = newEndTime.trim(),
+                                            colorHex = newColorHex,
+                                            untilDate = newUntilDate.trim().ifBlank { null },
+                                            location = newLocation.trim().ifBlank { null }
+                                        )
+                                        onAddScheduleSlot(slot)
+                                        com.example.util.AppHaptics.success(context)
+                                        Toast.makeText(context, "Пара добавлена в расписание", Toast.LENGTH_SHORT).show()
+                                        newTitle = ""
+                                        isCreatingSlot = false
+                                    }
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "СОХРАНИТЬ В РАСПИСАНИЕ",
+                                    color = colors.accent1,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                        }
+                    }
+
+                    // Active Slots List
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 240.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        if (scheduleSlots.isEmpty()) {
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 12.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "НЕТ СОЗДАННЫХ ПАР В РАСПИСАНИИ",
+                                        color = colors.textMuted,
+                                        fontSize = 9.sp,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                            }
+                        } else {
+                            items(scheduleSlots, key = { it.id }) { slot ->
+                                val slotColor = parseSlotColor(slot.colorHex)
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(shapes.secondary)
+                                        .background(colors.bgBase)
+                                        .border(0.5.dp, slotColor.copy(alpha = 0.35f), shapes.secondary)
+                                        .padding(8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .width(3.dp)
+                                                .height(28.dp)
+                                                .clip(shapes.secondary)
+                                                .background(slotColor)
+                                        )
+
+                                        Column {
+                                            Text(
+                                                text = slot.title,
+                                                color = colors.textMain,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                fontFamily = FontFamily.Monospace
+                                            )
+                                            Text(
+                                                text = "${getDayOfWeekShortName(slot.dayOfWeek)} • [ ${slot.startTime} - ${slot.endTime} ] • ${getRecurrenceLabel(slot.recurrence)}",
+                                                color = slotColor,
+                                                fontSize = 8.5.sp,
+                                                fontFamily = FontFamily.Monospace
+                                            )
+                                            if (!slot.location.isNullOrBlank() || !slot.untilDate.isNullOrBlank()) {
+                                                Text(
+                                                    text = listOfNotNull(slot.location?.let { "📍 $it" }, slot.untilDate?.let { "до $it" }).joinToString(" • "),
+                                                    color = colors.textMuted,
+                                                    fontSize = 8.sp,
+                                                    fontFamily = FontFamily.Monospace
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    // Delete button
+                                    Box(
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .clip(shapes.secondary)
+                                            .background(colors.bgButton)
+                                            .border(0.5.dp, Color.Red.copy(alpha = 0.4f), shapes.secondary)
+                                            .clickable {
+                                                com.example.util.AppHaptics.tick(context)
+                                                onDeleteScheduleSlot(slot.id)
+                                                Toast.makeText(context, "Пара удалена", Toast.LENGTH_SHORT).show()
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Delete",
+                                            tint = Color.Red.copy(alpha = 0.8f),
+                                            modifier = Modifier.size(12.dp)
                                         )
                                     }
                                 }
@@ -579,6 +1306,32 @@ fun TemporalFluxModal(
             }
         }
     }
+}
+
+private fun getDayOfWeekShortName(day: DayOfWeek): String = when(day) {
+    DayOfWeek.MONDAY -> "ПН"
+    DayOfWeek.TUESDAY -> "ВТ"
+    DayOfWeek.WEDNESDAY -> "СР"
+    DayOfWeek.THURSDAY -> "ЧТ"
+    DayOfWeek.FRIDAY -> "ПТ"
+    DayOfWeek.SATURDAY -> "СБ"
+    DayOfWeek.SUNDAY -> "ВС"
+}
+
+private fun getDayOfWeekFullName(day: DayOfWeek): String = when(day) {
+    DayOfWeek.MONDAY -> "ПОНЕДЕЛЬНИК"
+    DayOfWeek.TUESDAY -> "ВТОРНИК"
+    DayOfWeek.WEDNESDAY -> "СРЕДА"
+    DayOfWeek.THURSDAY -> "ЧЕТВЕРГ"
+    DayOfWeek.FRIDAY -> "ПЯТНИЦА"
+    DayOfWeek.SATURDAY -> "СУББОТА"
+    DayOfWeek.SUNDAY -> "ВОСКРЕСЕНЬЕ"
+}
+
+private fun getRecurrenceLabel(rec: RecurrenceType): String = when(rec) {
+    RecurrenceType.WEEKLY -> "КАЖДУЮ НЕДЕЛЮ"
+    RecurrenceType.BIWEEKLY_ODD -> "НЕЧЕТНАЯ (ЧИСЛИТЕЛЬ)"
+    RecurrenceType.BIWEEKLY_EVEN -> "ЧЕТНАЯ (ЗНАМЕНАТЕЛЬ)"
 }
 
 /**
