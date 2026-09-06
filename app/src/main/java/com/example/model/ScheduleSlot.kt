@@ -1,4 +1,4 @@
-﻿package com.example.model
+package com.example.model
 
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -7,8 +7,8 @@ import java.util.UUID
 
 enum class RecurrenceType {
     WEEKLY,          // Every week (Каждую неделю)
-    BIWEEKLY_ODD,    // Every 2 weeks (Нечетная неделя / Числитель)
-    BIWEEKLY_EVEN    // Every 2 weeks (Четная неделя / Знаменатель)
+    BIWEEKLY_ODD,    // Every 2 weeks (Нечетная неделя)
+    BIWEEKLY_EVEN    // Every 2 weeks (Четная неделя)
 }
 
 val SCHEDULE_COLOR_PALETTE = listOf(

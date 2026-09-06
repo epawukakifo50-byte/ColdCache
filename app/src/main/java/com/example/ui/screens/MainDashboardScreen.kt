@@ -396,8 +396,8 @@ fun MainDashboardScreen(
                 onUpdateDaemon = { key, label, max, step, icon ->
                     viewModel.updateDaemonConfig(key, label, max, step, icon)
                 },
-                onAddDaemon = { label, max, step, icon, type, color ->
-                    viewModel.addCustomDaemon(label, max, step, icon, type, color)
+                onAddDaemon = { label, max, step, icon, type, color, overColor ->
+                    viewModel.addCustomDaemon(label, max, step, icon, type, color, overColor)
                 },
                 onDeleteDaemon = { key ->
                     viewModel.deleteCustomDaemon(key)
@@ -445,6 +445,7 @@ fun MainDashboardScreen(
                     onResetToday = { viewModel.resetDaemon(daemon.key) },
                     onAdjustToday = { delta -> viewModel.adjustDaemon(daemon.key, delta) },
                     onSetDayProgress = { dateStr, cur, max -> viewModel.setDaemonDayProgress(daemon.key, dateStr, cur, max) },
+                    onUpdateDaemon = { viewModel.updateDaemonFull(it) },
                     onClose = { viewModel.openDaemonHeatmap(null) }
                 )
             }

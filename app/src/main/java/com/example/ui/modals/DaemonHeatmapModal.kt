@@ -43,6 +43,7 @@ import com.example.data.local.PreferenceManager
 import com.example.model.Daemon
 import com.example.model.DaemonType
 import com.example.model.getDaemonColor
+import com.example.model.getDaemonOverColor
 import com.example.ui.components.DaemonIcon
 import com.example.ui.theme.LocalColdCacheColors
 import com.example.ui.theme.LocalColdCacheShapes
@@ -71,6 +72,7 @@ fun DaemonHeatmapModal(
     onResetToday: () -> Unit = {},
     onAdjustToday: (Int) -> Unit = {},
     onSetDayProgress: (dateStr: String, current: Int, max: Int) -> Unit = { _, _, _ -> },
+    onUpdateDaemon: (Daemon) -> Unit = {},
     onClose: () -> Unit
 ) {
     val colors = LocalColdCacheColors.current
@@ -80,10 +82,12 @@ fun DaemonHeatmapModal(
     val prefManager = remember { PreferenceManager(context) }
 
     val key = daemon.key
-    val dColor = remember(daemon, colors.isDark) {
+    val dColor = remember(daemon.colorHex, colors.isDark) {
         getDaemonColor(key, colors.isDark, daemon.colorHex)
     }
-    val overColor = remember(dColor) { getOverachievementColor(dColor) }
+    val overColor = remember(key, daemon.overColorHex, colors.isDark, dColor) {
+        getDaemonOverColor(key, colors.isDark, daemon.overColorHex, dColor)
+    }
 
     val today = remember { LocalDate.now() }
     val formatter = remember { DateTimeFormatter.ofPattern("yyyy-MM-dd") }
@@ -138,8 +142,9 @@ fun DaemonHeatmapModal(
     }
 
     val currentTodayVal = historyMap[today.format(formatter)]?.first ?: daemon.current
-    val currentPercent = if (daemon.max > 0) ((currentTodayVal.toFloat() / daemon.max) * 100).toInt() else 0
-    val isTodayOver = currentTodayVal > daemon.max && daemon.max > 0
+    val currentTodayRatio = if (daemon.max > 0) (currentTodayVal.toFloat() / daemon.max) else 0f
+    val currentPercent = (currentTodayRatio * 100).toInt()
+    val isTodayOver = currentTodayRatio > 1.10f && daemon.max > 0
 
     Column(
         modifier = Modifier
@@ -288,6 +293,66 @@ fun DaemonHeatmapModal(
                 }
             }
 
+            // Overachievement Color Selector
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(shapes.primary)
+                    .background(colors.bgPanel)
+                    .border(0.5.dp, overColor.copy(alpha = 0.35f), shapes.primary)
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "ЦВЕТ ПЕРЕВЫПОЛНЕНИЯ (>110%):",
+                            color = overColor,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 0.5.sp
+                        )
+                        Text(
+                            text = "Выберите оттенок для шкалы 110%..150%+",
+                            color = colors.textMuted,
+                            fontSize = 7.5.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        val overPalette = listOf(
+                            "#ec4899", "#a855f7", "#06b6d4", "#f59e0b",
+                            "#eab308", "#acf002", "#3b82f6", "#10b981", "#ffffff"
+                        )
+                        overPalette.forEach { hex ->
+                            val c = com.example.ui.theme.parseHexColor(hex)
+                            val isSel = daemon.overColorHex?.equals(hex, ignoreCase = true) == true ||
+                                    (daemon.overColorHex == null && overColor == c)
+                            Box(
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .clip(shapes.secondary)
+                                    .background(c)
+                                    .border(
+                                        if (isSel) 1.5.dp else 0.5.dp,
+                                        if (isSel) Color.White else colors.borderStrong.copy(alpha = 0.3f),
+                                        shapes.secondary
+                                    )
+                                    .clickable {
+                                        com.example.util.AppHaptics.tick(context)
+                                        onUpdateDaemon(daemon.copy(overColorHex = hex))
+                                    }
+                            )
+                        }
+                    }
+                }
+            }
+
             // 12-Week (84-Day) Activity Heatmap with Overachievement Visual Grading
             Box(
                 modifier = Modifier
@@ -312,9 +377,9 @@ fun DaemonHeatmapModal(
                             letterSpacing = 1.sp
                         )
 
-                        // 6-Step Intensity Legend (Normal levels + OVERACHIEVED gradient)
+                        // 8-Step Intensity Legend (0%, 25%, 50%, 75%, 100%, 110%+, 130%+, 150%+)
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(3.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
@@ -323,24 +388,37 @@ fun DaemonHeatmapModal(
                                 fontSize = 7.sp,
                                 fontFamily = FontFamily.Monospace
                             )
-                            listOf(0.08f, 0.25f, 0.50f, 0.75f, 1.0f).forEach { alpha ->
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .clip(shapes.secondary)
-                                        .background(if (alpha <= 0.08f) colors.borderStrong.copy(alpha = 0.2f) else dColor.copy(alpha = alpha))
-                                )
-                            }
-                            // 6th Element: Overachieved gradient block
+                            // 0%
+                            Box(modifier = Modifier.size(7.dp).clip(shapes.secondary).background(colors.borderStrong.copy(alpha = 0.2f)))
+                            // 25%
+                            Box(modifier = Modifier.size(7.dp).clip(shapes.secondary).background(dColor.copy(alpha = 0.25f)))
+                            // 50%
+                            Box(modifier = Modifier.size(7.dp).clip(shapes.secondary).background(dColor.copy(alpha = 0.50f)))
+                            // 75%
+                            Box(modifier = Modifier.size(7.dp).clip(shapes.secondary).background(dColor.copy(alpha = 0.75f)))
+                            // 100% (Solid base color)
+                            Box(modifier = Modifier.size(7.dp).clip(shapes.secondary).background(dColor))
+                            // 110%+ (Overachievement step 1)
+                            Box(modifier = Modifier.size(7.dp).clip(shapes.secondary).background(Brush.linearGradient(listOf(dColor, androidx.compose.ui.graphics.lerp(dColor, overColor, 0.45f)))))
+                            // 130%+ (Overachievement step 2)
+                            Box(modifier = Modifier.size(7.dp).clip(shapes.secondary).background(Brush.linearGradient(listOf(dColor, overColor))))
+                            // 150%+ (Overachievement max + white dot)
                             Box(
                                 modifier = Modifier
-                                    .size(8.dp)
+                                    .size(7.dp)
                                     .clip(shapes.secondary)
-                                    .background(Brush.linearGradient(listOf(dColor, overColor)))
-                                    .border(0.5.dp, overColor, shapes.secondary)
-                            )
+                                    .background(Brush.linearGradient(listOf(overColor, Color.White.copy(alpha = 0.85f), overColor)))
+                                    .border(0.5.dp, Color.White, shapes.secondary)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(2.dp)
+                                        .align(Alignment.TopEnd)
+                                        .background(Color.White)
+                                )
+                            }
                             Text(
-                                text = "OVER",
+                                text = "150%+",
                                 color = overColor,
                                 fontSize = 7.sp,
                                 fontWeight = FontWeight.Bold,
@@ -368,45 +446,50 @@ fun DaemonHeatmapModal(
                                     val isSelected = date == selectedDate
 
                                     val ratio = if (dayTarget > 0) (dayVal.toFloat() / dayTarget) else 0f
-                                    val isOverachieved = dayVal > dayTarget && dayTarget > 0
+                                    val isCompleted = ratio >= 1.0f
+                                    val isOverachieved = ratio > 1.10f
 
-                                    val bgAlpha = when {
-                                        ratio >= 0.95f -> 1.0f
-                                        ratio >= 0.65f -> 0.75f
-                                        ratio >= 0.35f -> 0.50f
-                                        ratio > 0f -> 0.25f
-                                        else -> 0.08f
+                                    val bgModifier = when {
+                                        ratio >= 1.50f -> Modifier.background(
+                                            Brush.linearGradient(listOf(overColor, Color.White.copy(alpha = 0.85f), overColor))
+                                        )
+                                        ratio >= 1.30f -> Modifier.background(
+                                            Brush.linearGradient(listOf(dColor, overColor))
+                                        )
+                                        ratio > 1.10f -> Modifier.background(
+                                            Brush.linearGradient(listOf(dColor, androidx.compose.ui.graphics.lerp(dColor, overColor, 0.45f)))
+                                        )
+                                        isCompleted -> Modifier.background(dColor)
+                                        dayVal > 0 -> {
+                                            val bgAlpha = when {
+                                                ratio >= 0.65f -> 0.75f
+                                                ratio >= 0.35f -> 0.50f
+                                                else -> 0.25f
+                                            }
+                                            Modifier.background(dColor.copy(alpha = bgAlpha))
+                                        }
+                                        else -> Modifier.background(colors.borderStrong.copy(alpha = 0.2f))
+                                    }
+
+                                    val borderColor = when {
+                                        isSelected -> Color.White
+                                        ratio >= 1.50f -> Color.White
+                                        ratio >= 1.30f -> overColor
+                                        ratio > 1.10f -> androidx.compose.ui.graphics.lerp(dColor, overColor, 0.5f)
+                                        isCompleted -> dColor
+                                        isToday -> dColor
+                                        dayVal > 0 -> dColor.copy(alpha = 0.6f)
+                                        else -> Color.Transparent
                                     }
 
                                     Box(
                                         modifier = Modifier
                                             .size(20.dp)
                                             .clip(shapes.secondary)
-                                            .then(
-                                                if (isOverachieved) {
-                                                    Modifier.background(
-                                                        Brush.linearGradient(
-                                                            if (ratio >= 1.6f) {
-                                                                listOf(dColor, overColor, Color.White.copy(alpha = 0.85f))
-                                                            } else {
-                                                                listOf(dColor, overColor)
-                                                            }
-                                                        )
-                                                    )
-                                                } else {
-                                                    val cellColor = if (dayVal > 0) dColor.copy(alpha = bgAlpha) else colors.borderStrong.copy(alpha = 0.2f)
-                                                    Modifier.background(cellColor)
-                                                }
-                                            )
+                                            .then(bgModifier)
                                             .border(
                                                 width = if (isSelected) 1.5.dp else if (isToday) 1.dp else 0.5.dp,
-                                                color = when {
-                                                    isSelected -> Color.White
-                                                    isOverachieved -> overColor
-                                                    isToday -> dColor
-                                                    dayVal > 0 -> dColor.copy(alpha = 0.6f)
-                                                    else -> Color.Transparent
-                                                },
+                                                color = borderColor,
                                                 shape = shapes.secondary
                                             )
                                             .clickable {
@@ -414,7 +497,8 @@ fun DaemonHeatmapModal(
                                                 selectedDate = date
                                             }
                                     ) {
-                                        if (isOverachieved) {
+                                        // White corner marker ONLY at 150%+
+                                        if (ratio >= 1.50f) {
                                             Box(
                                                 modifier = Modifier
                                                     .size(4.dp)
@@ -440,7 +524,8 @@ fun DaemonHeatmapModal(
                 val dayTarget = dayData?.second ?: daemon.max
                 val isToday = date == today
                 val ratio = if (dayTarget > 0) (dayVal.toFloat() / dayTarget) else 0f
-                val isOverachieved = dayVal > dayTarget && dayTarget > 0
+                val isCompleted = ratio >= 1.0f
+                val isOverachieved = ratio > 1.10f
                 val completionPercent = (ratio * 100).toInt()
 
                 Column(
@@ -480,12 +565,12 @@ fun DaemonHeatmapModal(
                                 Text(
                                     text = when {
                                         isOverachieved -> "STATUS: OVERACHIEVED [ $completionPercent% ] ⚡"
-                                        dayVal >= dayTarget && dayTarget > 0 -> "STATUS: GOAL ACHIEVED [ 100% ]"
+                                        isCompleted -> "STATUS: GOAL ACHIEVED [ $completionPercent% ]"
                                         else -> "STATUS: PARTIAL / IN PROGRESS [ $completionPercent% ]"
                                     },
                                     color = when {
                                         isOverachieved -> overColor
-                                        dayVal >= dayTarget && dayTarget > 0 -> dColor
+                                        isCompleted -> dColor
                                         else -> colors.textMuted
                                     },
                                     fontSize = 9.sp,

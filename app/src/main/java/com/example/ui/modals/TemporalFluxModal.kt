@@ -368,7 +368,7 @@ fun TemporalFluxModal(
                                     fontSize = 10.sp
                                 )
                                 Text(
-                                    text = if (scheduleSlots.isNotEmpty()) "РАСПИСАНИЕ (${scheduleSlots.size})" else "РАСПИСАНИЕ",
+                                    text = if (scheduleSlots.isNotEmpty()) "СОБЫТИЯ (${scheduleSlots.size})" else "СОБЫТИЯ",
                                     color = colors.accent1,
                                     fontSize = 9.sp,
                                     fontWeight = FontWeight.Bold,
@@ -609,9 +609,18 @@ fun TemporalFluxModal(
                                 fontFamily = FontFamily.Monospace,
                                 letterSpacing = 1.sp
                             )
-                            if (dayOfWeekTitle.isNotBlank()) {
+                            val weekParityTitle = if (dayDate != null) {
+                                try {
+                                    val startMonday = LocalDate.parse("2026-09-01").with(DayOfWeek.MONDAY)
+                                    val dateMonday = dayDate.with(DayOfWeek.MONDAY)
+                                    val weeks = java.time.temporal.ChronoUnit.WEEKS.between(startMonday, dateMonday)
+                                    if (weeks % 2L == 0L) "НЕЧЕТНАЯ НЕДЕЛЯ" else "ЧЕТНАЯ НЕДЕЛЯ"
+                                } catch (_: Exception) { null }
+                            } else null
+                            val headerSub = listOfNotNull(dayOfWeekTitle.ifBlank { null }, weekParityTitle).joinToString(" • ")
+                            if (headerSub.isNotBlank()) {
                                 Text(
-                                    text = dayOfWeekTitle,
+                                    text = headerSub,
                                     color = colors.textMuted,
                                     fontSize = 9.sp,
                                     fontWeight = FontWeight.SemiBold,
@@ -636,11 +645,11 @@ fun TemporalFluxModal(
                             .heightIn(max = 380.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        // Section 1: 🎓 РАСПИСАНИЕ И ПАРЫ
+                        // Section 1: 🎓 СОБЫТИЯ И ПАРЫ
                         if (daySlots.isNotEmpty()) {
                             item {
                                 Text(
-                                    text = "🎓 РАСПИСАНИЕ И ПАРЫ (${daySlots.size})",
+                                    text = "🎓 СОБЫТИЯ И ПАРЫ (${daySlots.size})",
                                     color = colors.accent1,
                                     fontSize = 9.sp,
                                     fontWeight = FontWeight.Bold,
@@ -703,9 +712,9 @@ fun TemporalFluxModal(
                                     ) {
                                         Text(
                                             text = when(slot.recurrence) {
-                                                RecurrenceType.WEEKLY -> "ЕЖЕНЕДЕЛЬНО"
-                                                RecurrenceType.BIWEEKLY_ODD -> "ЧИСЛИТЕЛЬ"
-                                                RecurrenceType.BIWEEKLY_EVEN -> "ЗНАМЕНАТЕЛЬ"
+                                                RecurrenceType.WEEKLY -> "КАЖДУЮ НЕДЕЛЮ"
+                                                RecurrenceType.BIWEEKLY_ODD -> "НЕЧЕТНАЯ НЕДЕЛЯ"
+                                                RecurrenceType.BIWEEKLY_EVEN -> "ЧЕТНАЯ НЕДЕЛЯ"
                                             },
                                             color = slotColor,
                                             fontSize = 8.sp,
@@ -849,7 +858,7 @@ fun TemporalFluxModal(
                                                 .padding(horizontal = 10.dp, vertical = 6.dp)
                                         ) {
                                             Text(
-                                                text = "+ ДОБАВИТЬ ПАРУ В РАСПИСАНИЕ",
+                                                text = "+ ДОБАВИТЬ СОБЫТИЕ",
                                                 color = colors.accent1,
                                                 fontSize = 9.sp,
                                                 fontWeight = FontWeight.Bold,
@@ -874,7 +883,7 @@ fun TemporalFluxModal(
         var newRecurrence by remember { mutableStateOf(RecurrenceType.WEEKLY) }
         var newStartTime by remember { mutableStateOf("09:45") }
         var newEndTime by remember { mutableStateOf("13:25") }
-        var newLocation by remember { mutableStateOf("Ауд. 301") }
+        var newLocation by remember { mutableStateOf("Каб. 301") }
         var newUntilDate by remember { mutableStateOf("2026-12-31") }
         var newColorHex by remember { mutableStateOf(SCHEDULE_COLOR_PALETTE[0]) }
 
@@ -904,7 +913,7 @@ fun TemporalFluxModal(
                         ) {
                             Text(text = "🎓", fontSize = 14.sp)
                             Text(
-                                text = "УПРАВЛЕНИЕ РАСПИСАНИЕМ",
+                                text = "УПРАВЛЕНИЕ СОБЫТИЯМИ",
                                 color = colors.accent1,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
@@ -925,7 +934,7 @@ fun TemporalFluxModal(
 
                     // Notice: Information only, isolated from tasks
                     Text(
-                        text = "Слоты расписания отображаются исключительно в Календаре и не загромождают активные списки задач.",
+                        text = "Слоты событий отображаются исключительно в Календаре и не загромождают активные списки задач.",
                         color = colors.textMuted,
                         fontSize = 8.5.sp,
                         fontFamily = FontFamily.Monospace
@@ -946,7 +955,7 @@ fun TemporalFluxModal(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = if (isCreatingSlot) "СВЕРНУТЬ ФОРМУ" else "+ СОЗДАТЬ НОВУЮ ПАРУ / СЛОТ",
+                            text = if (isCreatingSlot) "СВЕРНУТЬ ФОРМУ" else "+ СОЗДАТЬ НОВОЕ СОБЫТИЕ",
                             color = colors.accent1,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
@@ -1025,9 +1034,9 @@ fun TemporalFluxModal(
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     listOf(
-                                        RecurrenceType.WEEKLY to "ЕЖЕНЕДЕЛЬНО",
-                                        RecurrenceType.BIWEEKLY_ODD to "ЧИСЛИТЕЛЬ",
-                                        RecurrenceType.BIWEEKLY_EVEN to "ЗНАМЕНАТЕЛЬ"
+                                        RecurrenceType.WEEKLY to "КАЖДУЮ НЕДЕЛЮ",
+                                        RecurrenceType.BIWEEKLY_ODD to "НЕЧЕТНАЯ НЕДЕЛЯ",
+                                        RecurrenceType.BIWEEKLY_EVEN to "ЧЕТНАЯ НЕДЕЛЯ"
                                     ).forEach { (rType, label) ->
                                         val isSel = newRecurrence == rType
                                         Box(
@@ -1100,7 +1109,7 @@ fun TemporalFluxModal(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                    Text(text = "АУДИТОРИЯ / МЕСТО:", color = colors.textMuted, fontSize = 8.sp, fontFamily = FontFamily.Monospace)
+                                    Text(text = "МЕСТО:", color = colors.textMuted, fontSize = 8.sp, fontFamily = FontFamily.Monospace)
                                     BasicTextField(
                                         value = newLocation,
                                         onValueChange = { newLocation = it },
@@ -1170,7 +1179,7 @@ fun TemporalFluxModal(
                                     .border(0.5.dp, colors.accent1, shapes.secondary)
                                     .clickable {
                                         if (newTitle.isBlank()) {
-                                            Toast.makeText(context, "Введите название пары", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, "Введите название события", Toast.LENGTH_SHORT).show()
                                             return@clickable
                                         }
                                         val slot = ScheduleSlot(
@@ -1185,7 +1194,7 @@ fun TemporalFluxModal(
                                         )
                                         onAddScheduleSlot(slot)
                                         com.example.util.AppHaptics.success(context)
-                                        Toast.makeText(context, "Пара добавлена в расписание", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, "Событие успешно сохранено", Toast.LENGTH_SHORT).show()
                                         newTitle = ""
                                         isCreatingSlot = false
                                     }
@@ -1193,7 +1202,7 @@ fun TemporalFluxModal(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = "СОХРАНИТЬ В РАСПИСАНИЕ",
+                                    text = "СОХРАНИТЬ СОБЫТИЕ",
                                     color = colors.accent1,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
@@ -1219,7 +1228,7 @@ fun TemporalFluxModal(
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        text = "НЕТ СОЗДАННЫХ ПАР В РАСПИСАНИИ",
+                                        text = "НЕТ СОЗДАННЫХ СОБЫТИЙ",
                                         color = colors.textMuted,
                                         fontSize = 9.sp,
                                         fontFamily = FontFamily.Monospace
@@ -1330,8 +1339,8 @@ private fun getDayOfWeekFullName(day: DayOfWeek): String = when(day) {
 
 private fun getRecurrenceLabel(rec: RecurrenceType): String = when(rec) {
     RecurrenceType.WEEKLY -> "КАЖДУЮ НЕДЕЛЮ"
-    RecurrenceType.BIWEEKLY_ODD -> "НЕЧЕТНАЯ (ЧИСЛИТЕЛЬ)"
-    RecurrenceType.BIWEEKLY_EVEN -> "ЧЕТНАЯ (ЗНАМЕНАТЕЛЬ)"
+    RecurrenceType.BIWEEKLY_ODD -> "НЕЧЕТНАЯ НЕДЕЛЯ"
+    RecurrenceType.BIWEEKLY_EVEN -> "ЧЕТНАЯ НЕДЕЛЯ"
 }
 
 /**

@@ -109,7 +109,7 @@ fun SettingsModal(
     daemons: Map<String, Daemon>,
     onUpdateConfig: ((SystemConfig) -> SystemConfig) -> Unit,
     onUpdateDaemon: (String, String?, Int?, Int?, String?) -> Unit,
-    onAddDaemon: (String, Int, Int, String, com.example.model.DaemonType, String?) -> Unit = { _, _, _, _, _, _ -> },
+    onAddDaemon: (String, Int, Int, String, com.example.model.DaemonType, String?, String?) -> Unit = { _, _, _, _, _, _, _ -> },
     onDeleteDaemon: (String) -> Unit = {},
     onMoveDaemon: (String, Int) -> Unit = { _, _ -> },
     onUpdateDaemonFull: (Daemon) -> Unit = {},
@@ -1259,7 +1259,7 @@ private fun MemoryJournalSettingsSection(
 private fun ModularDaemonsSettingsSection(
     daemons: Map<String, Daemon>,
     onUpdateDaemon: (String, String?, Int?, Int?, String?) -> Unit,
-    onAddDaemon: (String, Int, Int, String, com.example.model.DaemonType, String?) -> Unit,
+    onAddDaemon: (String, Int, Int, String, com.example.model.DaemonType, String?, String?) -> Unit,
     onDeleteDaemon: (String) -> Unit,
     onMoveDaemon: (String, Int) -> Unit,
     onUpdateDaemonFull: (Daemon) -> Unit,
@@ -1277,6 +1277,7 @@ private fun ModularDaemonsSettingsSection(
     var newDaemonIcon by remember { mutableStateOf("SquareActivity") }
     var newDaemonType by remember { mutableStateOf(DaemonType.MANUAL) }
     var newDaemonColorHex by remember { mutableStateOf("#acf002") }
+    var newDaemonOverColorHex by remember { mutableStateOf("#ec4899") }
 
     val daemonPalette = listOf(
         "#acf002", "#06b6d4", "#f00281", "#a855f7",
@@ -1451,6 +1452,46 @@ private fun ModularDaemonsSettingsSection(
                         }
                     }
 
+                    // Overachievement Color Selection
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "ЦВЕТ ПЕРЕВЫПОЛНЕНИЯ (>110%):",
+                            color = parseHexColor(newDaemonOverColorHex),
+                            fontSize = 7.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            val overPalette = listOf(
+                                "#ec4899", "#a855f7", "#06b6d4", "#f59e0b",
+                                "#eab308", "#acf002", "#3b82f6", "#10b981", "#ffffff"
+                            )
+                            overPalette.forEach { hex ->
+                                val c = parseHexColor(hex)
+                                val isSel = newDaemonOverColorHex.equals(hex, ignoreCase = true)
+                                Box(
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .clip(shapes.secondary)
+                                        .background(c)
+                                        .border(
+                                            if (isSel) 1.5.dp else 0.5.dp,
+                                            if (isSel) Color.White else colors.borderStrong.copy(alpha = 0.3f),
+                                            shapes.secondary
+                                        )
+                                        .clickable {
+                                            newDaemonOverColorHex = hex
+                                            com.example.util.AppHaptics.tick(context)
+                                        }
+                                )
+                            }
+                        }
+                    }
+
                     // Icon Selector + Max + Step
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -1471,8 +1512,12 @@ private fun ModularDaemonsSettingsSection(
                                         modifier = Modifier
                                             .size(22.dp)
                                             .clip(shapes.secondary)
-                                            .background(if (isSel) colors.bgButtonActive else colors.bgButton)
-                                            .border(0.5.dp, if (isSel) colors.accent1 else colors.borderStrong.copy(alpha = 0.3f), shapes.secondary)
+                                            .background(if (isSel) colors.accent1.copy(alpha = 0.22f) else colors.bgButton)
+                                            .border(
+                                                0.5.dp,
+                                                if (isSel) colors.accent1 else colors.borderStrong.copy(alpha = 0.3f),
+                                                shapes.secondary
+                                            )
                                             .clickable {
                                                 newDaemonIcon = iName
                                                 com.example.util.AppHaptics.tick(context)
@@ -1482,24 +1527,16 @@ private fun ModularDaemonsSettingsSection(
                                         DaemonIcon(
                                             name = iName,
                                             tint = if (isSel) colors.accent1 else colors.textMuted,
-                                            modifier = Modifier.size(11.dp)
+                                            modifier = Modifier.size(12.dp)
                                         )
                                     }
                                 }
                             }
                         }
 
-                        // Target & Step
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "MAX:",
-                                color = colors.textMuted,
-                                fontSize = 8.sp,
-                                fontFamily = FontFamily.Monospace
-                            )
+                        // Max input
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(text = "MAX", color = colors.textMuted, fontSize = 7.sp, fontFamily = FontFamily.Monospace)
                             BasicTextField(
                                 value = newDaemonMax,
                                 onValueChange = { newDaemonMax = it },
@@ -1507,23 +1544,22 @@ private fun ModularDaemonsSettingsSection(
                                 textStyle = TextStyle(
                                     color = colors.textMain,
                                     fontFamily = FontFamily.Monospace,
-                                    fontSize = 10.sp
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
                                 ),
                                 cursorBrush = SolidColor(colors.accent1),
                                 modifier = Modifier
-                                    .width(44.dp)
+                                    .width(55.dp)
                                     .clip(shapes.secondary)
                                     .background(colors.bgBase)
                                     .border(0.5.dp, colors.borderStrong, shapes.secondary)
                                     .padding(horizontal = 4.dp, vertical = 2.dp)
                             )
+                        }
 
-                            Text(
-                                text = "STEP:",
-                                color = colors.textMuted,
-                                fontSize = 8.sp,
-                                fontFamily = FontFamily.Monospace
-                            )
+                        // Step input
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(text = "STEP", color = colors.textMuted, fontSize = 7.sp, fontFamily = FontFamily.Monospace)
                             BasicTextField(
                                 value = newDaemonStep,
                                 onValueChange = { newDaemonStep = it },
@@ -1531,11 +1567,12 @@ private fun ModularDaemonsSettingsSection(
                                 textStyle = TextStyle(
                                     color = colors.textMain,
                                     fontFamily = FontFamily.Monospace,
-                                    fontSize = 10.sp
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
                                 ),
                                 cursorBrush = SolidColor(colors.accent1),
                                 modifier = Modifier
-                                    .width(36.dp)
+                                    .width(42.dp)
                                     .clip(shapes.secondary)
                                     .background(colors.bgBase)
                                     .border(0.5.dp, colors.borderStrong, shapes.secondary)
@@ -1560,7 +1597,8 @@ private fun ModularDaemonsSettingsSection(
                                         s,
                                         newDaemonIcon,
                                         newDaemonType,
-                                        newDaemonColorHex
+                                        newDaemonColorHex,
+                                        newDaemonOverColorHex
                                     )
                                     newDaemonLabel = ""
                                     isCreatingDaemon = false
@@ -1784,6 +1822,48 @@ private fun ModularDaemonsSettingsSection(
                                         .clickable {
                                             com.example.util.AppHaptics.tick(context)
                                             onUpdateDaemonFull(daemon.copy(colorHex = hex))
+                                        }
+                                )
+                            }
+                        }
+                    }
+
+                    // Row 2b: Overachievement Color Dots
+                    val dOverColor = getDaemonOverColor(key, colors.isDark, daemon.overColorHex, dColor)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "ЦВЕТ ПЕРЕВЫПОЛНЕНИЯ (>110%):",
+                            color = dOverColor,
+                            fontSize = 7.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            val overPalette = listOf(
+                                "#ec4899", "#a855f7", "#06b6d4", "#f59e0b",
+                                "#eab308", "#acf002", "#3b82f6", "#10b981", "#ffffff"
+                            )
+                            overPalette.forEach { hex ->
+                                val c = parseHexColor(hex)
+                                val isSel = daemon.overColorHex?.equals(hex, ignoreCase = true) == true ||
+                                        (daemon.overColorHex == null && dOverColor == c)
+                                Box(
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .clip(shapes.secondary)
+                                        .background(c)
+                                        .border(
+                                            if (isSel) 1.5.dp else 0.5.dp,
+                                            if (isSel) Color.White else colors.borderStrong.copy(alpha = 0.3f),
+                                            shapes.secondary
+                                        )
+                                        .clickable {
+                                            com.example.util.AppHaptics.tick(context)
+                                            onUpdateDaemonFull(daemon.copy(overColorHex = hex))
                                         }
                                 )
                             }

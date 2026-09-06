@@ -15,7 +15,8 @@ data class Daemon(
     val step: Int,
     val iconName: String,
     val type: DaemonType = DaemonType.MANUAL,
-    val colorHex: String? = null
+    val colorHex: String? = null,
+    val overColorHex: String? = null
 )
 
 val AVAILABLE_DAEMON_ICONS = listOf(
@@ -36,9 +37,9 @@ val AVAILABLE_DAEMON_ICONS = listOf(
 )
 
 val DEFAULT_DAEMONS = linkedMapOf(
-    "d1" to Daemon("d1", "KINEMATICS", 0, 10000, 1000, "SquareActivity", DaemonType.SENSOR_STEPS, "#acf002"),
-    "d2" to Daemon("d2", "COOLANT", 0, 2000, 250, "Droplet", DaemonType.MANUAL, "#06b6d4"),
-    "d3" to Daemon("d3", "HARDWARE", 0, 1, 1, "Battery", DaemonType.MANUAL, "#f00281")
+    "d1" to Daemon("d1", "KINEMATICS", 0, 10000, 1000, "SquareActivity", DaemonType.SENSOR_STEPS, "#acf002", "#ec4899"),
+    "d2" to Daemon("d2", "COOLANT", 0, 2000, 250, "Droplet", DaemonType.MANUAL, "#06b6d4", "#a855f7"),
+    "d3" to Daemon("d3", "HARDWARE", 0, 1, 1, "Battery", DaemonType.MANUAL, "#f00281", "#eab308")
 )
 
 fun getDaemonColor(key: String, isDark: Boolean, colorHex: String? = null): Color {
@@ -66,6 +67,18 @@ fun getDaemonColor(key: String, isDark: Boolean, colorHex: String? = null): Colo
             "d3" -> Color(0xFF9E0154)
             else -> Color(0xFF0891B2)
         }
+    }
+}
+
+fun getDaemonOverColor(key: String, isDark: Boolean, overColorHex: String? = null, baseColor: Color? = null): Color {
+    if (!overColorHex.isNullOrBlank()) {
+        return com.example.ui.theme.parseHexColor(overColorHex)
+    }
+    return when (key) {
+        "d1" -> Color(0xFFEC4899) // Vivid cyber-pink/magenta (high contrast with lime #acf002)
+        "d2" -> Color(0xFFA855F7) // Purple (contrasting with cyan #06b6d4)
+        "d3" -> Color(0xFFEAB308) // Gold/Amber (contrasting with magenta #f00281)
+        else -> Color(0xFFEC4899)
     }
 }
 

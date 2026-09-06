@@ -388,11 +388,17 @@ class ColdCacheViewModel(
         stepSensorManager.restartListening()
     }
 
-    fun addCustomDaemon(label: String, max: Int, step: Int, iconName: String, type: DaemonType = DaemonType.MANUAL, colorHex: String? = null) {
+    fun addCustomDaemon(label: String, max: Int, step: Int, iconName: String, type: DaemonType = DaemonType.MANUAL, colorHex: String? = null, overColorHex: String? = null) {
         val currentDaemons = _daemons.value.toMutableMap()
         val newKey = "d_${System.currentTimeMillis()}"
         val palette = listOf("#acf002", "#06b6d4", "#a855f7", "#ec4899", "#f59e0b", "#3b82f6", "#10b981")
         val assignedColor = colorHex ?: if (type == DaemonType.SENSOR_STEPS) "#acf002" else palette[currentDaemons.size % palette.size]
+        val assignedOverColor = overColorHex ?: when (assignedColor) {
+            "#acf002" -> "#ec4899"
+            "#06b6d4" -> "#a855f7"
+            "#f00281" -> "#eab308"
+            else -> "#ec4899"
+        }
         val newDaemon = Daemon(
             key = newKey,
             label = label.trim().ifBlank { "DAEMON" },
@@ -401,7 +407,8 @@ class ColdCacheViewModel(
             step = step.coerceAtLeast(1),
             iconName = iconName,
             type = type,
-            colorHex = assignedColor
+            colorHex = assignedColor,
+            overColorHex = assignedOverColor
         )
         currentDaemons[newKey] = newDaemon
         _daemons.value = OrderedDaemonMap(currentDaemons)
@@ -424,6 +431,9 @@ class ColdCacheViewModel(
         currentDaemons[daemon.key] = daemon
         _daemons.value = OrderedDaemonMap(currentDaemons)
         prefManager.saveDaemons(currentDaemons)
+        if (_selectedHeatmapDaemon.value?.key == daemon.key) {
+            _selectedHeatmapDaemon.value = daemon
+        }
         syncExternalViews()
     }
 
@@ -443,7 +453,7 @@ class ColdCacheViewModel(
         com.example.util.AppHaptics.tick(appContext, _systemConfig.value.hapticFeedbackEnabled)
     }
 
-    fun updateDaemonConfig(key: String, label: String? = null, max: Int? = null, step: Int? = null, iconName: String? = null, type: DaemonType? = null, colorHex: String? = null) {
+    fun updateDaemonConfig(key: String, label: String? = null, max: Int? = null, step: Int? = null, iconName: String? = null, type: DaemonType? = null, colorHex: String? = null, overColorHex: String? = null) {
         val currentDaemons = _daemons.value.toMutableMap()
         val d = currentDaemons[key] ?: return
         currentDaemons[key] = d.copy(
@@ -452,10 +462,14 @@ class ColdCacheViewModel(
             step = step ?: d.step,
             iconName = iconName ?: d.iconName,
             type = type ?: d.type,
-            colorHex = colorHex ?: d.colorHex
+            colorHex = colorHex ?: d.colorHex,
+            overColorHex = overColorHex ?: d.overColorHex
         )
         _daemons.value = OrderedDaemonMap(currentDaemons)
         prefManager.saveDaemons(currentDaemons)
+        if (_selectedHeatmapDaemon.value?.key == key) {
+            _selectedHeatmapDaemon.value = currentDaemons[key]
+        }
         syncExternalViews()
     }
 

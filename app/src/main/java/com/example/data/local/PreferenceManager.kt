@@ -99,8 +99,9 @@ class PreferenceManager(context: Context) {
                     val typeName = obj.optString("type", DaemonType.MANUAL.name)
                     val type = try { DaemonType.valueOf(typeName) } catch (_: Exception) { DaemonType.MANUAL }
                     val colorHex = if (obj.has("colorHex") && !obj.isNull("colorHex")) obj.getString("colorHex") else null
+                    val overColorHex = if (obj.has("overColorHex") && !obj.isNull("overColorHex")) obj.getString("overColorHex") else null
                     val current = obj.optInt("current", 0)
-                    result[key] = Daemon(key, label, current, max, step, iconName, type, colorHex)
+                    result[key] = Daemon(key, label, current, max, step, iconName, type, colorHex, overColorHex)
                 }
             } catch (_: Exception) {}
         } else if (!savedObjectJson.isNullOrEmpty()) {
@@ -117,8 +118,9 @@ class PreferenceManager(context: Context) {
                     val typeName = obj.optString("type", DaemonType.MANUAL.name)
                     val type = try { DaemonType.valueOf(typeName) } catch (_: Exception) { DaemonType.MANUAL }
                     val colorHex = if (obj.has("colorHex") && !obj.isNull("colorHex")) obj.getString("colorHex") else null
+                    val overColorHex = if (obj.has("overColorHex") && !obj.isNull("overColorHex")) obj.getString("overColorHex") else null
                     val current = obj.optInt("current", 0)
-                    result[key] = Daemon(key, label, current, max, step, iconName, type, colorHex)
+                    result[key] = Daemon(key, label, current, max, step, iconName, type, colorHex, overColorHex)
                 }
             } catch (_: Exception) {}
         }
@@ -186,6 +188,7 @@ class PreferenceManager(context: Context) {
                     put("iconName", d.iconName)
                     put("type", d.type.name)
                     put("colorHex", d.colorHex)
+                    put("overColorHex", d.overColorHex)
                 }
                 array.put(obj)
                 root.put(k, obj)
