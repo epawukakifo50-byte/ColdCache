@@ -1167,7 +1167,7 @@ private fun MemoryJournalSettingsSection(
                     modifier = Modifier.size(18.dp)
                 )
                 Text(
-                    text = "📄 EXPORT JOURNAL TO MARKDOWN (.MD)",
+                    text = "EXPORT JOURNAL TO MARKDOWN (.MD)",
                     color = colors.accent1,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
@@ -2687,7 +2687,7 @@ private fun SystemInfoAndUpdatesSection(
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(
-                                text = "⚡ НАЙДЕНО ОБНОВЛЕНИЕ: ${availableUpdate.latestVersion}",
+                                text = "НАЙДЕНО ОБНОВЛЕНИЕ: ${availableUpdate.latestVersion}",
                                 color = colors.accent1,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,

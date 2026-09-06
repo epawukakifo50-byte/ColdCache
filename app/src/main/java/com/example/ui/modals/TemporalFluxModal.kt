@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -363,9 +364,11 @@ fun TemporalFluxModal(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Text(
-                                    text = "🎓",
-                                    fontSize = 10.sp
+                                Icon(
+                                    imageVector = Icons.Default.CalendarMonth,
+                                    contentDescription = null,
+                                    tint = colors.accent1,
+                                    modifier = Modifier.size(11.dp)
                                 )
                                 Text(
                                     text = if (scheduleSlots.isNotEmpty()) "СОБЫТИЯ (${scheduleSlots.size})" else "СОБЫТИЯ",
@@ -645,17 +648,28 @@ fun TemporalFluxModal(
                             .heightIn(max = 380.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        // Section 1: 🎓 СОБЫТИЯ И ПАРЫ
+                        // Section 1: СОБЫТИЯ И ПАРЫ
                         if (daySlots.isNotEmpty()) {
                             item {
-                                Text(
-                                    text = "🎓 СОБЫТИЯ И ПАРЫ (${daySlots.size})",
-                                    color = colors.accent1,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace,
-                                    letterSpacing = 1.sp
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CalendarMonth,
+                                        contentDescription = null,
+                                        tint = colors.accent1,
+                                        modifier = Modifier.size(11.dp)
+                                    )
+                                    Text(
+                                        text = "СОБЫТИЯ И ПАРЫ (${daySlots.size})",
+                                        color = colors.accent1,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace,
+                                        letterSpacing = 1.sp
+                                    )
+                                }
                             }
 
                             items(daySlots, key = { it.id }) { slot ->
@@ -694,12 +708,23 @@ fun TemporalFluxModal(
                                             fontFamily = FontFamily.Monospace
                                         )
                                         if (!slot.location.isNullOrBlank()) {
-                                            Text(
-                                                text = "📍 ${slot.location}",
-                                                color = colors.textMuted,
-                                                fontSize = 9.sp,
-                                                fontFamily = FontFamily.Monospace
-                                            )
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Place,
+                                                    contentDescription = null,
+                                                    tint = colors.textMuted,
+                                                    modifier = Modifier.size(10.dp)
+                                                )
+                                                Text(
+                                                    text = slot.location,
+                                                    color = colors.textMuted,
+                                                    fontSize = 9.sp,
+                                                    fontFamily = FontFamily.Monospace
+                                                )
+                                            }
                                         }
                                     }
 
@@ -726,12 +751,12 @@ fun TemporalFluxModal(
                             }
                         }
 
-                        // Section 2: ⚡ ЗАДАЧИ
+                        // Section 2: ЗАДАЧИ
                         if (dayTasks.isNotEmpty()) {
                             item {
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "⚡ ЗАДАЧИ НА ЭТОТ ДЕНЬ (${dayTasks.size})",
+                                    text = "ЗАДАЧИ НА ЭТОТ ДЕНЬ (${dayTasks.size})",
                                     color = dominantColor,
                                     fontSize = 9.sp,
                                     fontWeight = FontWeight.Bold,
@@ -911,7 +936,12 @@ fun TemporalFluxModal(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Text(text = "🎓", fontSize = 14.sp)
+                            Icon(
+                                imageVector = Icons.Default.CalendarMonth,
+                                contentDescription = null,
+                                tint = colors.accent1,
+                                modifier = Modifier.size(15.dp)
+                            )
                             Text(
                                 text = "УПРАВЛЕНИЕ СОБЫТИЯМИ",
                                 color = colors.accent1,
@@ -1277,7 +1307,7 @@ fun TemporalFluxModal(
                                             )
                                             if (!slot.location.isNullOrBlank() || !slot.untilDate.isNullOrBlank()) {
                                                 Text(
-                                                    text = listOfNotNull(slot.location?.let { "📍 $it" }, slot.untilDate?.let { "до $it" }).joinToString(" • "),
+                                                    text = listOfNotNull(slot.location?.let { "[ $it ]" }, slot.untilDate?.let { "до $it" }).joinToString(" • "),
                                                     color = colors.textMuted,
                                                     fontSize = 8.sp,
                                                     fontFamily = FontFamily.Monospace

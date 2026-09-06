@@ -407,7 +407,7 @@ fun DaemonHeatmapModal(
                                 modifier = Modifier
                                     .size(7.dp)
                                     .clip(shapes.secondary)
-                                    .background(Brush.linearGradient(listOf(overColor, Color.White.copy(alpha = 0.85f), overColor)))
+                                    .background(overColor)
                                     .border(0.5.dp, Color.White, shapes.secondary)
                             ) {
                                 Box(
@@ -450,9 +450,7 @@ fun DaemonHeatmapModal(
                                     val isOverachieved = ratio > 1.10f
 
                                     val bgModifier = when {
-                                        ratio >= 1.50f -> Modifier.background(
-                                            Brush.linearGradient(listOf(overColor, Color.White.copy(alpha = 0.85f), overColor))
-                                        )
+                                        ratio >= 1.50f -> Modifier.background(overColor)
                                         ratio >= 1.30f -> Modifier.background(
                                             Brush.linearGradient(listOf(dColor, overColor))
                                         )
@@ -564,7 +562,7 @@ fun DaemonHeatmapModal(
                                 )
                                 Text(
                                     text = when {
-                                        isOverachieved -> "STATUS: OVERACHIEVED [ $completionPercent% ] ⚡"
+                                        isOverachieved -> "STATUS: OVERACHIEVED [ $completionPercent% ]"
                                         isCompleted -> "STATUS: GOAL ACHIEVED [ $completionPercent% ]"
                                         else -> "STATUS: PARTIAL / IN PROGRESS [ $completionPercent% ]"
                                     },
@@ -694,13 +692,24 @@ fun DaemonHeatmapModal(
                                 .padding(vertical = 7.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = if (isToday) "✏️ ЗАДАТЬ" else "✏️ ИЗМЕНИТЬ ДАННЫЕ ДНЯ",
-                                color = colors.accent1,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = null,
+                                    tint = colors.accent1,
+                                    modifier = Modifier.size(11.dp)
+                                )
+                                Text(
+                                    text = if (isToday) "ЗАДАТЬ" else "ИЗМЕНИТЬ ДАННЫЕ ДНЯ",
+                                    color = colors.accent1,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
                         }
                     }
                 }

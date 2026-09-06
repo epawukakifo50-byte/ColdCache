@@ -425,13 +425,7 @@ fun SystemHeader(
                         if (animatedProgress > 0f) {
                             val fillModifier = when {
                                 ratio >= 1.50f -> Modifier.background(
-                                    Brush.horizontalGradient(
-                                        listOf(
-                                            overColor.copy(alpha = if (colors.isDark) 0.38f else 0.30f),
-                                            Color.White.copy(alpha = if (colors.isDark) 0.28f else 0.22f),
-                                            overColor.copy(alpha = if (colors.isDark) 0.38f else 0.30f)
-                                        )
-                                    )
+                                    overColor.copy(alpha = if (colors.isDark) 0.45f else 0.35f)
                                 )
                                 ratio >= 1.30f -> Modifier.background(
                                     Brush.horizontalGradient(

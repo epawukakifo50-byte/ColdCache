@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -130,8 +131,14 @@ fun MainDashboardScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CloudDownload,
+                                        contentDescription = null,
+                                        tint = colors.accent1,
+                                        modifier = Modifier.size(13.dp)
+                                    )
                                     Text(
-                                        text = "⚡ ДОСТУПНО ОБНОВЛЕНИЕ",
+                                        text = "ДОСТУПНО ОБНОВЛЕНИЕ",
                                         color = colors.accent1,
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
