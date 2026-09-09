@@ -34,6 +34,7 @@ class StepSensorManager private constructor(private val context: Context) : Sens
         private const val KEY_STEP_BASELINE_SENSOR = "cc_step_baseline_sensor"
         private const val KEY_STEP_BASELINE_DATE = "cc_step_baseline_date"
         private const val KEY_STEP_BASELINE_SET = "cc_step_baseline_set"
+        private const val KEY_LAST_HARDWARE_TOTAL = "cc_step_last_hardware_total"
 
         @Volatile
         private var instance: StepSensorManager? = null
@@ -163,13 +164,16 @@ class StepSensorManager private constructor(private val context: Context) : Sens
     /** Reset step baseline when user manually clears/edits steps or on explicit daily reset */
     fun resetBaseline(newCurrentSteps: Int = 0) {
         val today = todayString()
-        val sensorTotal = if (lastKnownSensorTotal > 0L) {
-            lastKnownSensorTotal
-        } else {
-            val isSet = prefs.getBoolean(KEY_STEP_BASELINE_SET, false)
-            if (isSet) {
-                prefs.getLong(KEY_STEP_BASELINE_SENSOR, 0L) + loadCurrentStepsFromDaemon()
-            } else -1L
+        val lastHardware = prefs.getLong(KEY_LAST_HARDWARE_TOTAL, -1L)
+        val sensorTotal = when {
+            lastKnownSensorTotal > 0L -> lastKnownSensorTotal
+            lastHardware > 0L -> lastHardware
+            else -> {
+                val isSet = prefs.getBoolean(KEY_STEP_BASELINE_SET, false)
+                if (isSet) {
+                    prefs.getLong(KEY_STEP_BASELINE_SENSOR, 0L) + loadCurrentStepsFromDaemon()
+                } else -1L
+            }
         }
 
         if (sensorTotal > 0L) {
@@ -191,15 +195,17 @@ class StepSensorManager private constructor(private val context: Context) : Sens
 
         when (event.sensor.type) {
             Sensor.TYPE_STEP_COUNTER -> {
-                val totalSinceBoot = event.values[0].toLong()
-                lastKnownSensorTotal = totalSinceBoot
+                val totalSinceBoot = event.values[0].toLong().coerceAtLeast(0L)
                 val today = todayString()
+                val lastHardware = prefs.getLong(KEY_LAST_HARDWARE_TOTAL, -1L)
 
                 // 1. Midnight rollover while running
                 if (activeBaselineDate != today) {
                     Log.d(TAG, "Midnight / New Day rollover: totalSinceBoot=$totalSinceBoot, previousDate=$activeBaselineDate, today=$today")
                     saveBaseline(totalSinceBoot, today)
                     setStepDaemons(0)
+                    prefs.edit().putLong(KEY_LAST_HARDWARE_TOTAL, totalSinceBoot).apply()
+                    lastKnownSensorTotal = totalSinceBoot
                     return
                 }
 
@@ -209,13 +215,24 @@ class StepSensorManager private constructor(private val context: Context) : Sens
                     val newBaseline = totalSinceBoot - savedStepsToday
                     Log.d(TAG, "Initializing baseline today: totalSinceBoot=$totalSinceBoot, savedStepsToday=$savedStepsToday, baseline=$newBaseline")
                     saveBaseline(newBaseline, today)
-                } else if (lastKnownSensorTotal > 0L && totalSinceBoot < lastKnownSensorTotal - 100L) {
-                    // 3. Device reboot detected during today (hardware counter restarted from 0)
-                    val savedStepsToday = loadCurrentStepsFromDaemon()
-                    val recoveredBaseline = totalSinceBoot - savedStepsToday
-                    Log.d(TAG, "Device reboot detected: totalSinceBoot=$totalSinceBoot < lastKnown=$lastKnownSensorTotal. Recovering baseline to $recoveredBaseline")
-                    saveBaseline(recoveredBaseline, today)
+                } else {
+                    // 3. Device reboot detection:
+                    // Hardware counter reset to 0 upon device reboot.
+                    // Detected if totalSinceBoot is significantly less than either:
+                    //   a) the baseline established before reboot, or
+                    //   b) the last recorded hardware reading before reboot.
+                    val isReboot = (lastHardware > 0L && totalSinceBoot < lastHardware - 50L) ||
+                                   (baselineSensorValue > 0L && totalSinceBoot < baselineSensorValue)
+                    if (isReboot) {
+                        val savedStepsToday = loadCurrentStepsFromDaemon()
+                        val recoveredBaseline = totalSinceBoot - savedStepsToday
+                        Log.w(TAG, "Device reboot detected! totalSinceBoot=$totalSinceBoot, lastHardware=$lastHardware, oldBaseline=$baselineSensorValue. Recovering baseline to $recoveredBaseline (retained steps=$savedStepsToday)")
+                        saveBaseline(recoveredBaseline, today)
+                    }
                 }
+
+                lastKnownSensorTotal = totalSinceBoot
+                prefs.edit().putLong(KEY_LAST_HARDWARE_TOTAL, totalSinceBoot).apply()
 
                 val todaySteps = (totalSinceBoot - baselineSensorValue).coerceAtLeast(0L).toInt()
                 setStepDaemons(todaySteps)

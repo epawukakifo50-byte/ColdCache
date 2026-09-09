@@ -399,15 +399,15 @@ fun DaemonHeatmapModal(
                             // 100% (Solid base color)
                             Box(modifier = Modifier.size(7.dp).clip(shapes.secondary).background(dColor))
                             // 110%+ (Overachievement step 1)
-                            Box(modifier = Modifier.size(7.dp).clip(shapes.secondary).background(Brush.linearGradient(listOf(dColor, androidx.compose.ui.graphics.lerp(dColor, overColor, 0.45f)))))
+                            Box(modifier = Modifier.size(7.dp).clip(shapes.secondary).background(Brush.linearGradient(listOf(dColor, androidx.compose.ui.graphics.lerp(dColor, overColor, 0.40f)))))
                             // 130%+ (Overachievement step 2)
-                            Box(modifier = Modifier.size(7.dp).clip(shapes.secondary).background(Brush.linearGradient(listOf(dColor, overColor))))
-                            // 150%+ (Overachievement max + white dot)
+                            Box(modifier = Modifier.size(7.dp).clip(shapes.secondary).background(Brush.linearGradient(listOf(dColor, androidx.compose.ui.graphics.lerp(dColor, overColor, 0.70f)))))
+                            // 150%+ (Overachievement max: vivid gradient from dColor to overColor + white border + white dot)
                             Box(
                                 modifier = Modifier
                                     .size(7.dp)
                                     .clip(shapes.secondary)
-                                    .background(overColor)
+                                    .background(Brush.linearGradient(listOf(dColor, overColor)))
                                     .border(0.5.dp, Color.White, shapes.secondary)
                             ) {
                                 Box(
@@ -450,12 +450,14 @@ fun DaemonHeatmapModal(
                                     val isOverachieved = ratio > 1.10f
 
                                     val bgModifier = when {
-                                        ratio >= 1.50f -> Modifier.background(overColor)
-                                        ratio >= 1.30f -> Modifier.background(
+                                        ratio >= 1.50f -> Modifier.background(
                                             Brush.linearGradient(listOf(dColor, overColor))
                                         )
+                                        ratio >= 1.30f -> Modifier.background(
+                                            Brush.linearGradient(listOf(dColor, androidx.compose.ui.graphics.lerp(dColor, overColor, 0.70f)))
+                                        )
                                         ratio > 1.10f -> Modifier.background(
-                                            Brush.linearGradient(listOf(dColor, androidx.compose.ui.graphics.lerp(dColor, overColor, 0.45f)))
+                                            Brush.linearGradient(listOf(dColor, androidx.compose.ui.graphics.lerp(dColor, overColor, 0.40f)))
                                         )
                                         isCompleted -> Modifier.background(dColor)
                                         dayVal > 0 -> {

@@ -75,6 +75,11 @@ class TaskAlarmReceiver : BroadcastReceiver() {
                     TaskScheduler.scheduleMidnightResetAlarm(appContext)
 
                     if (didReset) {
+                        try {
+                            com.example.sensor.StepSensorManager.getInstance(appContext).resetBaseline(0)
+                        } catch (e: Exception) {
+                            android.util.Log.e("TaskAlarmReceiver", "Failed to reset step baseline on rollover", e)
+                        }
                         val resetDaemons = prefManager.loadDaemons()
                         // Update widget and tray
                         com.example.widget.ColdCacheWidgetProvider.updateAllWidgets(appContext)
